@@ -1,0 +1,43 @@
+name: Build One UI 8 TB-J716F engineering image
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zstd e2fsprogs
+          python3 -m pip install --user gdown==5.2.0
+      - name: Fetch and verify pinned One UI 8 donor
+        run: |
+          set -euo pipefail
+          python3 -m gdown --id 13z87bzceVOA71cHmdXKKyN7F7yNYf1Yn -O donor.img.zst
+          test "$(stat -c%s donor.img.zst)" -eq 2683294844
+          echo 'b9155186e0bf0ef88ef30181395c7be85f854edfe7bddccf6029a8941b8274b1  donor.img.zst' | sha256sum -c -
+          zstd -d --stdout donor.img.zst > donor.img
+          rm donor.img.zst
+          test "$(stat -c%s donor.img)" -eq 6845104128
+          echo '6946aa3fdcafa3475c1809b640f0df5c  donor.img' | md5sum -c -
+      - name: Generate staging overlay and patch copied donor image
+        run: |
+          set -euo pipefail
+          python3 tools/create_tbj716f_staging_overlay.py --output overlay
+          python3 tools/build_oneui8_tbj716f_image.py donor.img overlay --output tbj716f-oneui8-engineering.img --report build-report.json
+          rm donor.img
+      - name: Compress engineering image
+        run: zstd -T2 -3 tbj716f-oneui8-engineering.img -o tbj716f-oneui8-engineering.img.zst
+      - name: Upload image and build report (NOT flashable)
+        uses: actions/upload-artifact@v4
+        with:
+          name: oneui8-tbj716f-engineering-NOT-FLASHABLE
+          path: |
+            tbj716f-oneui8-engineering.img.zst
+            build-report.json
+          retention-days: 3
+          if-no-files-found: error
