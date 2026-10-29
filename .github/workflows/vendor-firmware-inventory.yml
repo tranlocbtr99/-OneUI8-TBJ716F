@@ -1,0 +1,64 @@
+name: Vendor firmware inventory (offline)
+on:
+  workflow_dispatch:
+    inputs:
+      firmware_url:
+        description: 'Direct HTTPS link to a publicly distributable vendor build.prop (optional)'
+        required: false
+        type: string
+      expected_sha256:
+        description: 'SHA256 of vendor build.prop (mandatory with URL)'
+        required: false
+        type: string
+jobs:
+  inventory:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate inputs
+        env:
+          URL: ${{ inputs.firmware_url }}
+          SHA: ${{ inputs.expected_sha256 }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$URL" ]]; then
+            echo "HAS_INPUT=0" >> "$GITHUB_ENV"
+            echo "No vendor property file supplied; use synthetic fixture."
+          else
+            [[ "$URL" =~ ^https:// ]] || { echo "HTTPS required"; exit 1; }
+            [[ "$SHA" =~ ^[0-9a-fA-F]{64}$ ]] || { echo "SHA256 required"; exit 1; }
+            echo "HAS_INPUT=1" >> "$GITHUB_ENV"
+          fi
+      - name: Download verified property file
+        if: env.HAS_INPUT == '1'
+        env:
+          URL: ${{ inputs.firmware_url }}
+          SHA: ${{ inputs.expected_sha256 }}
+        run: |
+          set -euo pipefail
+          curl -fL --retry 2 --connect-timeout 20 --max-time 120 --max-filesize 1048576 -o vendor-build.prop "$URL"
+          printf '%s  vendor-build.prop\n' "$SHA" | sha256sum -c -
+      - name: Generate sample data (tool validation only)
+        if: env.HAS_INPUT == '0'
+        run: |
+          printf 'ro.vendor.build.version.sdk=33\nro.vndk.version=33\n' > vendor-build.prop
+      - name: Run read-only inventory
+        run: |
+          python3 tools/vendor_inventory.py --vendor-build-prop vendor-build.prop --output vendor-compatibility.json
+          {
+            echo "## Vendor inventory"
+            if [[ "$HAS_INPUT" == '1' ]]; then
+              echo "Source: verified supplied property file (not independently verified as TB-J716F firmware)"
+            else
+              echo "Source: synthetic sample only; **not real TB-J716F vendor data**"
+            fi
+            echo 'The output is an inventory, not proof of Android 16 or One UI 8 compatibility.'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: vendor-compatibility-inventory
+          path: vendor-compatibility.json
