@@ -1,0 +1,60 @@
+name: ARM64 QEMU TCG real kernel boot baseline
+on:
+  workflow_dispatch:
+jobs:
+  qemu-tcg:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - name: Install QEMU and Ubuntu ARM64 kernel
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends qemu-system-arm linux-image-virtual
+      - name: Boot an ARM64 Linux kernel in QEMU TCG
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p output
+          kernel=$(find /boot -maxdepth 1 -name 'vmlinuz-*' -type f | sort -V | tail -1)
+          test -n "$kernel"
+          echo "kernel=$kernel" | tee output/inputs.txt
+          qemu-system-aarch64 --version | tee -a output/inputs.txt
+          set +e
+          timeout --signal=TERM --kill-after=5s 90s qemu-system-aarch64 \
+            -machine virt,accel=tcg -cpu cortex-a72 -smp 2 -m 2048 \
+            -nographic -monitor none -no-reboot \
+            -kernel "$kernel" \
+            -append 'console=ttyAMA0 earlycon=pl011,0x9000000 loglevel=7 panic=-1' \
+            > output/serial.log 2>&1
+          code=$?
+          set -e
+          echo "$code" > output/qemu-exit-code.txt
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          log=Path('output/serial.log').read_text(errors='replace')
+          result={
+            "qemu_tcg_executed":True,
+            "linux_kernel_started":("Linux version" in log or "Booting Linux on physical CPU" in log),
+            "android_booted":False,
+            "oneui_booted":False,
+            "kvm_used":False,
+            "expected_kernel_panic_without_android_initramfs":True,
+            "qemu_exit_code":Path('output/qemu-exit-code.txt').read_text().strip(),
+            "interpretation":"Linux kernel execution proves only QEMU TCG baseline, not Android or One UI compatibility."
+          }
+          Path('output/result.json').write_text(json.dumps(result,indent=2)+'\n')
+          print(json.dumps(result,indent=2))
+          if not result["linux_kernel_started"]:
+            raise SystemExit("No evidence of ARM64 Linux kernel execution")
+          PY
+      - name: Upload boot logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arm64-qemu-tcg-kernel-baseline
+          path: output/
+          retention-days: 7
