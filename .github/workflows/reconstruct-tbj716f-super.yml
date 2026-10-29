@@ -27,6 +27,8 @@ jobs:
           PY
       - name: Probe LP geometry and verify checksum
         run: python3 tools/probe_lp_geometry.py super.img --output report/lp-geometry.json
+      - name: Validate LP metadata tables and enumerate vendor extents
+        run: python3 tools/inspect_lp_metadata.py super.img --output report/lp-partitions.json
       - name: Upload metadata only, never firmware images
         if: always()
         uses: actions/upload-artifact@v4
