@@ -70,6 +70,28 @@ jobs:
           if not result['target_level'] or not hals:
               raise SystemExit('Stock manifest lacks target-level or HAL entries')
           PY
+      - name: Inventory vendor VINTF fragments and compatibility evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p report/vendor-vintf/fragments
+          debugfs -R 'ls -p /etc/vintf' vendor_a.img > report/vendor-vintf/directory-list.txt 2>&1
+          debugfs -R 'ls -p /etc/vintf/manifest' vendor_a.img > report/vendor-vintf/fragment-list.txt 2>&1 || true
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, subprocess, json
+          listing=Path('report/vendor-vintf/fragment-list.txt').read_text(errors='replace')
+          names=sorted(set(re.findall(r'([A-Za-z0-9_.+-]+\\.xml)', listing)))
+          status=[]
+          for name in names:
+              dest=Path('report/vendor-vintf/fragments')/name
+              proc=subprocess.run(['debugfs','-R',f'dump /etc/vintf/manifest/{name} {dest}','vendor_a.img'],capture_output=True,text=True)
+              if proc.returncode or not dest.is_file() or not dest.stat().st_size:
+                  raise SystemExit(f'Unable to read VINTF fragment {name}: {proc.stderr}')
+              status.append({'file':name,'bytes':dest.stat().st_size})
+          Path('report/vendor-vintf/fragment-summary.json').write_text(json.dumps(status,indent=2)+chr(10))
+          print('Extracted vendor manifest fragments:',len(status))
+          PY
       - name: Compare stock Lenovo VINTF against One UI 8 donor
         shell: bash
         env:
