@@ -21,12 +21,12 @@ class OneUI8CompatibilityTests(unittest.TestCase):
         self.assertFalse(result["ready_for_device_trial"])
 
     def test_capacity_shortfall_rejected(self):
-        result = assess({"system_partition_free_bytes": 2_000_000_000})
+        result = assess({"system_partition_capacity_bytes": 2_000_000_000})
         self.assertEqual(result["checks"][4]["status"], "fail")
 
     def test_all_static_evidence_passes_but_no_boot_claim(self):
         result = assess({"model": "TB-J716F", "supported_abis": ["arm64-v8a"],
-                         "vendor_api_level": 34, "vintf_compatible": True,
+                         "vendor_api_level": 34, "vendor_runtime_verified": True, "vintf_compatible": True,
                          "system_partition_free_bytes": 7_000_000_000,
                          "verified_recovery_path": True})
         self.assertTrue(result["ready_for_device_trial"])
