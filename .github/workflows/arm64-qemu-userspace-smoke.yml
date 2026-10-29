@@ -1,0 +1,51 @@
+name: ARM64 QEMU userspace smoke test
+on:
+  workflow_dispatch:
+jobs:
+  boot-userspace:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    steps:
+      - name: Install QEMU kernel and initramfs tools
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends qemu-system-arm ipxe-qemu linux-image-virtual busybox-static cpio
+      - name: Build minimal ARM64 initramfs and boot
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p output/root/{bin,proc,sys,dev}
+          kernel=$(find /boot -maxdepth 1 -name 'vmlinuz-*-generic' -type f | sort -V | tail -1)
+          sudo install -m 0644 "$kernel" output/kernel.img
+          cp /usr/bin/busybox output/root/bin/busybox
+          cat > output/root/init <<'EOF'
+          #!/bin/busybox sh
+          /bin/busybox --install -s /bin
+          mount -t proc proc /proc
+          mount -t sysfs sysfs /sys
+          echo QEMU_ARM64_USERSPACE_OK
+          uname -a
+          poweroff -f
+          EOF
+          chmod +x output/root/init
+          (cd output/root && find . -print0 | cpio --null -o -H newc 2>/dev/null | gzip -1) > output/initramfs.cpio.gz
+          set +e
+          timeout --kill-after=5s 90s qemu-system-aarch64 -machine virt,accel=tcg -cpu cortex-a72 -smp 2 -m 2048 -nodefaults -serial mon:stdio -display none -no-reboot -kernel output/kernel.img -initrd output/initramfs.cpio.gz -append 'console=ttyAMA0 earlycon=pl011,0x9000000 loglevel=4 panic=-1' > output/serial.log 2>&1
+          code=$?
+          set -e
+          echo "qemu_exit_code=$code"
+          tail -n 70 output/serial.log
+          if ! grep -q 'QEMU_ARM64_USERSPACE_OK' output/serial.log; then
+            echo "FAIL: initramfs userspace was not reached"
+            exit 1
+          fi
+          echo 'PASS: ARM64 Linux userspace executed; Android and One UI were NOT tested'
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arm64-userspace-smoke-test
+          path: |
+            output/serial.log
+            output/initramfs.cpio.gz
+          retention-days: 7
