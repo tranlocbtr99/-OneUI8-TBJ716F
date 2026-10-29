@@ -16,7 +16,7 @@ jobs:
           set -euo pipefail
           mkdir -p stock donor report
           gh run download 40903127259 --repo "${{ github.repository }}" --name tbj716f-super-reconstruction-report --dir stock
-          gh run download 40831143271 --repo "${{ github.repository }}" --name oneui8-donor-analysis --dir donor
+          gh run download 40909083270 --repo "${{ github.repository }}" --name oneui8-donor-analysis --dir donor
           test -s stock/vendor-vintf/manifest.xml
           test -s donor/oneui8-donor-inventory.json
       - name: Compare and classify evidence without falsely failing extraction
