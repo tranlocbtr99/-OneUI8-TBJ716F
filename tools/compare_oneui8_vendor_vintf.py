@@ -10,6 +10,15 @@ import json
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
+def vendor_fcm_level(xml_text):
+    root = ET.fromstring(xml_text)
+    if root.tag != "manifest" or root.get("type") != "device":
+        raise ValueError("Expected a VINTF device manifest")
+    raw = root.get("target-level")
+    if raw is None or not raw.isdigit():
+        raise ValueError("Vendor manifest must declare numeric target-level; cannot infer FCM")
+    return int(raw)
+
 def vendor_hals(xml_text):
     root = ET.fromstring(xml_text)
     if root.tag != "manifest" or root.get("type") != "device":
@@ -19,10 +28,12 @@ def vendor_hals(xml_text):
 
 def compare(inventory, manifest_text, fcm_level=None):
     vendor = vendor_hals(manifest_text)
+    declared_level = vendor_fcm_level(manifest_text)
+    if fcm_level is not None and fcm_level != declared_level:
+        raise ValueError(f"FCM level mismatch: supplied {fcm_level}, manifest declares {declared_level}")
+    fcm_level = declared_level
     found = {}
     matrix_count = 0
-    if fcm_level is None:
-        return {"status": "vendor_fcm_level_required", "warning": "Specify the vendor target-level; do not combine matrices from different FCM levels."}
     for key, entry in inventory.get("files", {}).items():
         if key != f"framework_matrix_level_{fcm_level}" or not entry.get("present"):
             continue
@@ -52,7 +63,7 @@ def main():
     p.add_argument("donor_inventory", type=Path)
     p.add_argument("vendor_manifest_xml", type=Path)
     p.add_argument("--output", type=Path, default=Path("oneui8-tbj716f-vintf-gaps.json"))
-    p.add_argument("--vendor-fcm-level", type=int, choices=range(1, 9), required=True)
+    p.add_argument("--vendor-fcm-level", type=int, choices=range(1, 9), help="Optional cross-check against vendor manifest target-level")
     args = p.parse_args()
     result = compare(json.loads(args.donor_inventory.read_text(encoding="utf-8")),
                      args.vendor_manifest_xml.read_text(encoding="utf-8"), args.vendor_fcm_level)
