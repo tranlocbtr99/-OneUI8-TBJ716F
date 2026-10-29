@@ -25,15 +25,8 @@ jobs:
           print('First 64 bytes:', h[:64].hex())
           Path('report/super-first64-hex.txt').write_text(h[:64].hex()+'\\n')
           PY
-      - name: Verify Android logical partition metadata
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y android-sdk-libsparse-utils
-          command -v lpdump
-          lpdump super.img | tee report/lpdump.txt
-          grep -Eq 'Partition name:|Name:.*(vendor|system)' report/lpdump.txt
+      - name: Probe LP geometry and verify checksum
+        run: python3 tools/probe_lp_geometry.py super.img --output report/lp-geometry.json
       - name: Upload metadata only, never firmware images
         if: always()
         uses: actions/upload-artifact@v4
