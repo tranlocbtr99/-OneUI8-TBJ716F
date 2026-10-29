@@ -60,6 +60,9 @@ jobs:
           fi
       - name: Audit classified HAL evidence
         run: python3 tools/audit_oneui8_hal_evidence.py report/matrix-classification --output report/hal-evidence-audit.json
+      - name: Stage partial VINTF filesystem for future official validation
+        run: |
+          python3 tools/stage_partial_vintf_tree.py donor stock report/vintf-partial-tree
       - name: Upload small evidence report
         if: always()
         uses: actions/upload-artifact@v4
