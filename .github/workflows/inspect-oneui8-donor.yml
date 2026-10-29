@@ -9,6 +9,7 @@ on:
       drive_file_id:
         description: "Public Google Drive file ID (individual file, not folder)"
         required: false
+        default: "13z87bzceVOA71cHmdXKKyN7F7yNYf1Yn"
         type: string
 jobs:
   inspect:
