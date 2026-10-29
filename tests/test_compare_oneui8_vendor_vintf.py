@@ -4,7 +4,7 @@ import unittest
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "tools"))
 from compare_oneui8_vendor_vintf import compare, vendor_hals
 
-VENDOR = '<manifest version="1.0" type="device"><hal><name>android.hardware.audio</name></hal></manifest>'
+VENDOR = '<manifest version="1.0" type="device" target-level="6"><hal><name>android.hardware.audio</name></hal></manifest>'
 
 class VintfGapTests(unittest.TestCase):
     def test_name_matches_and_gaps(self):
