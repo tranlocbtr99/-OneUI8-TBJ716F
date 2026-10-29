@@ -70,11 +70,33 @@ jobs:
               json.dumps(out, indent=2) + "\\n")
           print(json.dumps(out, indent=2))
           PY
+      - name: Preserve raw donor VINTF matrices for optionality analysis
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p donor-output/raw-matrices
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import xml.etree.ElementTree as ET
+          for level in range(1, 9):
+              path=f'/system/etc/vintf/compatibility_matrix.{level}.xml'
+              result=subprocess.run(['debugfs','-R','cat '+path,'donor.img'],capture_output=True)
+              if result.returncode or not result.stdout:
+                  continue
+              if len(result.stdout)>1024*1024:
+                  raise SystemExit(f'Matrix too large: {path}')
+              root=ET.fromstring(result.stdout)
+              if root.tag!='compatibility-matrix' or root.get('type')!='framework':
+                  raise SystemExit(f'Unexpected matrix type: {path}')
+              (Path('donor-output/raw-matrices')/f'compatibility_matrix.{level}.xml').write_bytes(result.stdout)
+              print('Preserved',path)
+          PY
       - name: Upload reports only, never proprietary images
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: oneui8-donor-analysis
-          path: donor-output/*.json
+          path: donor-output/
           if-no-files-found: ignore
           retention-days: 7
