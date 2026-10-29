@@ -39,6 +39,36 @@ jobs:
           Path('report/vendor-a-first64-hex.txt').write_text(h[:64].hex()+chr(10))
           print('vendor_a first 64 bytes:', h[:64].hex())
           PY
+      - name: Extract stock vendor VINTF manifest (read-only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p report/vendor-vintf
+          sudo apt-get update -qq
+          sudo apt-get install -y e2fsprogs
+          debugfs -R 'stat /etc/vintf/manifest.xml' vendor_a.img > report/vendor-vintf/manifest-stat.txt 2>&1
+          debugfs -R 'dump /etc/vintf/manifest.xml report/vendor-vintf/manifest.xml' vendor_a.img > report/vendor-vintf/debugfs-dump-log.txt 2>&1
+          python3 - <<'PY'
+          import json
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+          p=Path('report/vendor-vintf/manifest.xml')
+          if not p.is_file() or not p.stat().st_size:
+              raise SystemExit('Missing vendor manifest')
+          root=ET.parse(p).getroot()
+          if root.tag!='manifest' or root.attrib.get('type')!='device':
+              raise SystemExit('Unexpected VINTF manifest')
+          hals=[]
+          for hal in root.findall('hal'):
+              hals.append({'name':hal.findtext('name'), 'format':hal.get('format'),
+                           'versions':[v.text for v in hal.findall('version')]})
+          result={'target_level':root.get('target-level'),'hal_count':len(hals),'hals':hals}
+          Path('report/vendor-vintf/manifest-summary.json').write_text(json.dumps(result,indent=2)+chr(10))
+          print('Stock vendor target-level:',result['target_level'])
+          print('Stock vendor HAL count:',len(hals))
+          if not result['target_level'] or not hals:
+              raise SystemExit('Stock manifest lacks target-level or HAL entries')
+          PY
       - name: Upload metadata only, never firmware images
         if: always()
         uses: actions/upload-artifact@v4
