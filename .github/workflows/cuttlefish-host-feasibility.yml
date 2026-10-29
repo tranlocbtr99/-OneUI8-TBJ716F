@@ -1,0 +1,52 @@
+name: Cuttlefish host feasibility probe
+on:
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check host virtualization and architecture
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p output
+          {
+            echo "# Cuttlefish host feasibility"
+            echo
+            echo "architecture: $(uname -m)"
+            echo "kernel: $(uname -r)"
+            echo "KVM device:"
+            ls -l /dev/kvm || true
+            echo "CPU virtualization flags:"
+            grep -Eom1 'vmx|svm' /proc/cpuinfo || true
+            echo "available memory:"
+            free -h
+            echo "disk:"
+            df -h .
+            echo "QEMU binary:"
+            command -v qemu-system-aarch64 || true
+            echo "Cuttlefish ARM64 guest requires ARM64 images AND compatible virtualization/emulation."
+          } | tee output/host-feasibility.txt
+          if [ -c /dev/kvm ]; then echo 'KVM_DEVICE_PRESENT=true' >> "$GITHUB_ENV"; else echo 'KVM_DEVICE_PRESENT=false' >> "$GITHUB_ENV"; fi
+      - name: Mark suitability without claiming boot
+        run: |
+          python3 - <<'PY'
+          import json,os,platform
+          kvm=os.environ.get("KVM_DEVICE_PRESENT")=="true"
+          arch=platform.machine()
+          result={"host_arch":arch,"kvm_device_present":kvm,
+                  "arm64_guest_kvm_eligible":kvm and arch in ("aarch64","arm64"),
+                  "oneui_boot_test_executed":False,
+                  "note":"GitHub-hosted x86_64 KVM cannot hardware-accelerate ARM64 guests; use ARM64 KVM host or explicitly provision slower emulation."}
+          with open("output/feasibility.json","w") as f:json.dump(result,f,indent=2)
+          print(result)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cuttlefish-host-feasibility
+          path: output/
+          retention-days: 7
