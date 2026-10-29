@@ -65,6 +65,9 @@ jobs:
           echo "$VENDOR_SHA  virtual-vendor.img" | sha256sum -c -
           curl --fail --location --retry 2 --max-time 1800 "$SYSTEM_URL" -o system.img
           echo "$SYSTEM_SHA  system.img" | sha256sum -c -
+      - name: Validate image formats before QEMU
+        run: |
+          python3 tools/validate_qemu_arm64_boot_assets.py --kernel Image --initrd ramdisk.img --system system.img --vendor virtual-vendor.img --output output/image-preflight.json
       - name: Attempt isolated ARM64 virtual boot
         run: |
           python3 tools/qemu_arm64_oneui8_boot_experiment.py --kernel Image --initrd ramdisk.img --system system.img --vendor virtual-vendor.img --seconds 180 --log output/qemu-console.log --result output/boot-result.json
