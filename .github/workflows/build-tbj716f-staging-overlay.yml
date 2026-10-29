@@ -1,0 +1,36 @@
+name: Build TB-J716F One UI 8 staging overlay
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - tools/create_tbj716f_staging_overlay.py
+      - .github/workflows/build-tbj716f-staging-overlay.yml
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate reversible overlay
+        run: |
+          set -euo pipefail
+          python3 tools/create_tbj716f_staging_overlay.py --output staging
+          python3 - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          root=Path('staging')
+          m=json.loads((root/'overlay-manifest.json').read_text())
+          assert m['flashable'] is False
+          assert m['target']=='TB-J716F'
+          for rel, digest in m['files'].items():
+              assert hashlib.sha256((root/rel).read_bytes()).hexdigest()==digest
+              assert rel.startswith('system/')
+          print('Staging overlay integrity verified; NOT a flashable ROM')
+          PY
+      - name: Upload staging overlay (not flashable)
+        uses: actions/upload-artifact@v4
+        with:
+          name: oneui8-tbj716f-staging-overlay-NOT-FLASHABLE
+          path: staging/
+          retention-days: 7
