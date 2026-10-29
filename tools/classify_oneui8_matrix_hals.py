@@ -27,6 +27,7 @@ def classify(matrix_xml, vendor_xml):
             "format":h.get("format"),
             "optional_attribute":optional,
             "required_by_this_entry":optional=="false",
+            "optionality_status": "explicit_optional" if optional=="true" else ("explicit_required" if optional=="false" else "unspecified"),
             "declared_in_base_vendor_manifest":name in provided,
             "versions":[x.text for x in h.findall("version") if x.text],
             "interfaces":[{"name":i.findtext("name"),"instances":[x.text for x in i.findall("instance") if x.text],
