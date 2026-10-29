@@ -25,8 +25,8 @@ def assess(e):
         "One UI 8 donor requires arm64-v8a")
     vendor_api = e.get("vendor_api_level")
     add("vendor_api_level", "unknown" if vendor_api is None else
-        ("review" if type(vendor_api) is int and vendor_api < 34 else
-         "review" if type(vendor_api) is int and vendor_api >= 34 else "fail"),
+        ("pass" if type(vendor_api) is int and vendor_api >= 0 and e.get("vendor_runtime_verified") is True else
+         "review" if type(vendor_api) is int and vendor_api >= 0 else "fail"),
         f"Donor Android API {DONOR_API}; vendor API {vendor_api!r}. Vendor API alone never proves Android 16 compatibility; requires tested VINTF/runtime evidence.")
     manifest = e.get("vintf_compatible")
     add("vintf", "unknown" if manifest is None else ("pass" if manifest is True else "fail"),
