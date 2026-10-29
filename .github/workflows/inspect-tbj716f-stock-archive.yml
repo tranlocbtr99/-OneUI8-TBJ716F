@@ -1,0 +1,52 @@
+name: Inspect TB-J716F stock firmware archive
+on:
+  workflow_dispatch:
+    inputs:
+      firmware_url:
+        description: "Public direct HTTPS firmware ZIP URL"
+        required: false
+        default: "https://mirrors-obs-1.lolinet.com/firmware/lenowow/2021/Tab_P11_Pro_2021/TB-J716F/TB-J716F_CN_OPEN_USER_Q00209.3_R_ZUI_13.0.430_ST_220113_qpst.zip"
+        type: string
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download stock archive (read-only)
+        env:
+          URL: ${{ inputs.firmware_url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$URL" == https://* ]] || exit 2
+          mkdir -p stock-report
+          curl --fail --location --retry 2 --proto '=https' --proto-redir '=https' --connect-timeout 30 --max-time 3000 --output stock.zip "$URL"
+          sha256sum stock.zip | tee stock-report/archive-sha256.txt
+          unzip -tq stock.zip
+      - name: Inventory ZIP paths without extracting firmware
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, zipfile
+          from pathlib import Path
+          with zipfile.ZipFile("stock.zip") as z:
+              entries = [{"name": i.filename, "size": i.file_size, "compressed_size": i.compress_size}
+                         for i in z.infolist() if not i.is_dir()]
+          out = {"archive": "TB-J716F ZUI 13 stock candidate",
+                 "entries": entries,
+                 "vendor_candidates": [e for e in entries if any(x in e["name"].lower() for x in ("vendor", "super.img", "rawprogram", "payload.bin"))],
+                 "warning": "File listing only. Firmware not flashed, vendor manifest not yet extracted."}
+          Path("stock-report/stock-archive-inventory.json").write_text(json.dumps(out,indent=2)+"\\n")
+          print(json.dumps(out["vendor_candidates"], indent=2))
+          PY
+      - name: Upload metadata only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tbj716f-stock-archive-inventory
+          path: stock-report/*
+          if-no-files-found: ignore
+          retention-days: 7
