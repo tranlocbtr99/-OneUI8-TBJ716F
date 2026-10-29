@@ -1,0 +1,17 @@
+name: One UI 8 VINTF gap comparison tests
+on:
+  push:
+    paths:
+      - 'tools/compare_oneui8_vendor_vintf.py'
+      - 'tests/test_compare_oneui8_vendor_vintf.py'
+      - '.github/workflows/oneui8-vintf-comparison-tests.yml'
+  workflow_dispatch:
+jobs:
+  unit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m unittest discover -s tests -p 'test_compare_oneui8_vendor_vintf.py' -v
