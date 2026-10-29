@@ -1,0 +1,44 @@
+name: ARM64 QEMU smoke test
+on:
+  workflow_dispatch:
+jobs:
+  qemu-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Install ARM64 emulator and firmware
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends qemu-system-arm qemu-efi-aarch64
+      - name: Verify emulator and firmware
+        run: |
+          qemu-system-aarch64 --version
+          qemu-system-aarch64 -machine help | grep -E '^virt ' || true
+          find /usr/share -iname '*AAVMF*' -o -iname '*QEMU_EFI*' | head -20
+          test -e /dev/kvm && echo 'KVM device exists (not proof of ARM64 acceleration)' || true
+      - name: ARM64 virtual machine firmware boot smoke test
+        run: |
+          set -euo pipefail
+          FW=$(find /usr/share -type f \( -name 'QEMU_EFI.fd' -o -name 'AAVMF_CODE.fd' \) | head -1)
+          test -n "$FW"
+          set +e
+          timeout 25s qemu-system-aarch64 -M virt -cpu cortex-a57 -m 1024 -smp 2 -nographic -monitor none -serial stdio -bios "$FW" > qemu-boot.log 2>&1
+          code=$?
+          set -e
+          cat qemu-boot.log
+          echo "QEMU exit code: $code"
+          if grep -Eiq 'UEFI|TianoCore|EDK II|Shell>|BdsDxe' qemu-boot.log; then
+            echo 'ARM64 UEFI firmware reached'
+          else
+            echo 'No firmware boot marker; smoke test inconclusive'
+            exit 1
+          fi
+      - name: Save logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arm64-qemu-smoke-logs
+          path: qemu-boot.log
+          if-no-files-found: ignore
