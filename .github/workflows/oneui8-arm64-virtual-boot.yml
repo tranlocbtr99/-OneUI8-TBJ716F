@@ -1,0 +1,76 @@
+name: Experimental One UI 8 ARM64 virtual boot (no physical device)
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_url:
+        description: HTTPS URL of QEMU virt ARM64 kernel
+        required: true
+      kernel_sha256:
+        description: SHA256 of kernel
+        required: true
+      initrd_url:
+        description: HTTPS URL of matching Android ramdisk
+        required: true
+      initrd_sha256:
+        description: SHA256 of ramdisk
+        required: true
+      virtual_vendor_url:
+        description: HTTPS URL of matching QEMU virt vendor raw image
+        required: true
+      virtual_vendor_sha256:
+        description: SHA256 of virtual vendor
+        required: true
+jobs:
+  virtual-boot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install QEMU and image tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-arm zstd
+      - name: Download verified virtual-device boot components
+        env:
+          KERNEL_URL: ${{ inputs.kernel_url }}
+          KERNEL_SHA: ${{ inputs.kernel_sha256 }}
+          INITRD_URL: ${{ inputs.initrd_url }}
+          INITRD_SHA: ${{ inputs.initrd_sha256 }}
+          VENDOR_URL: ${{ inputs.virtual_vendor_url }}
+          VENDOR_SHA: ${{ inputs.virtual_vendor_sha256 }}
+        run: |
+          set -euo pipefail
+          for item in KERNEL INITRD VENDOR; do
+            urlvar="${item}_URL"; hashvar="${item}_SHA"
+            url="${!urlvar}"; sha="${!hashvar}"
+            [[ "$url" == https://* ]] || { echo "HTTPS only"; exit 1; }
+            [[ "$sha" =~ ^[a-fA-F0-9]{64}$ ]] || { echo "Invalid SHA256"; exit 1; }
+          done
+          curl --fail --location --retry 2 --max-time 900 "$KERNEL_URL" -o Image
+          curl --fail --location --retry 2 --max-time 900 "$INITRD_URL" -o ramdisk.img
+          curl --fail --location --retry 2 --max-time 900 "$VENDOR_URL" -o virtual-vendor.img
+          echo "$KERNEL_SHA  Image" | sha256sum -c -
+          echo "$INITRD_SHA  ramdisk.img" | sha256sum -c -
+          echo "$VENDOR_SHA  virtual-vendor.img" | sha256sum -c -
+      - name: Retrieve previously built engineering image
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh run download 40916705889 --repo "$GITHUB_REPOSITORY" --name oneui8-tbj716f-engineering-NOT-FLASHABLE --dir engineering
+          zstd -d engineering/tbj716f-oneui8-engineering.img.zst -o engineering/system.img
+          echo 'cf3a6fdb29e5f42c36ec8dc2687380b89c38e8dfd5e9b570741f0b62b60b3c77  engineering/system.img' | sha256sum -c -
+      - name: Attempt isolated ARM64 virtual boot
+        run: |
+          python3 tools/qemu_arm64_oneui8_boot_experiment.py --kernel Image --initrd ramdisk.img --system engineering/system.img --vendor virtual-vendor.img --seconds 180 --log output/qemu-console.log --result output/boot-result.json
+      - name: Upload virtual boot evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oneui8-virtual-boot-evidence
+          path: output/
+          if-no-files-found: ignore
+          retention-days: 7
