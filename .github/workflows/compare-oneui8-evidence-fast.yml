@@ -23,8 +23,11 @@ jobs:
         shell: bash
         run: |
           set -uo pipefail
-          python3 tools/compare_oneui8_vendor_vintf.py donor/oneui8-donor-inventory.json stock/vendor-vintf/manifest.xml --output report/oneui8-preliminary-vintf-gap.json
-          rc=$?
+          if python3 tools/compare_oneui8_vendor_vintf.py donor/oneui8-donor-inventory.json stock/vendor-vintf/manifest.xml --output report/oneui8-preliminary-vintf-gap.json; then
+            rc=0
+          else
+            rc=$?
+          fi
           echo "Comparator exit code: $rc" >> "$GITHUB_STEP_SUMMARY"
           if [ "$rc" -eq 2 ]; then
             echo "### Inconclusive: insufficient matrix evidence, not a compatibility failure" >> "$GITHUB_STEP_SUMMARY"
