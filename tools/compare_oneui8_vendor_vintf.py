@@ -45,7 +45,7 @@ def compare(inventory, manifest_text, fcm_level=None):
             found.setdefault(name, []).append(key)
     required = set(found)
     return {
-        "status": "preliminary" if matrix_count else "insufficient_framework_matrix_evidence",
+        "status": "preliminary" if matrix_count and required else "insufficient_framework_matrix_evidence",
         "framework_matrices_parsed": matrix_count,
         "selected_vendor_fcm_level": fcm_level,
         "vendor_hal_names": len(vendor),
@@ -55,7 +55,7 @@ def compare(inventory, manifest_text, fcm_level=None):
             {"hal": name, "framework_sources": sorted(found[name])}
             for name in sorted(required - vendor)
         ],
-        "warning": "Name-only comparison; optional HALs and version/instance requirements are not checked. Do not use as flashing approval.",
+        "warning": "Name-only comparison; optional HALs and version/instance requirements are not checked. Empty framework HAL lists are insufficient evidence. Do not use as flashing approval.",
     }
 
 def main():
