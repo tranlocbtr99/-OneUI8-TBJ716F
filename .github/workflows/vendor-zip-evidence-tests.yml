@@ -6,9 +6,11 @@ on:
       - 'tools/extract_vendor_evidence.py'
       - 'tools/inventory_firmware_zip.py'
       - 'tools/probe_partition_formats.py'
+      - 'tools/check_firmware_identity.py'
       - 'tests/test_extract_vendor_evidence.py'
       - 'tests/test_inventory_firmware_zip.py'
       - 'tests/test_probe_partition_formats.py'
+      - 'tests/test_check_firmware_identity.py'
       - '.github/workflows/vendor-zip-evidence-tests.yml'
 jobs:
   test:
@@ -23,3 +25,4 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_extract_vendor_evidence.py' -v
           python3 -m unittest discover -s tests -p 'test_inventory_firmware_zip.py' -v
           python3 -m unittest discover -s tests -p 'test_probe_partition_formats.py' -v
+          python3 -m unittest discover -s tests -p 'test_check_firmware_identity.py' -v
