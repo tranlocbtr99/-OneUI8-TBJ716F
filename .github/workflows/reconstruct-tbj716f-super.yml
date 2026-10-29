@@ -29,6 +29,16 @@ jobs:
         run: python3 tools/probe_lp_geometry.py super.img --output report/lp-geometry.json
       - name: Validate LP metadata tables and enumerate vendor extents
         run: python3 tools/inspect_lp_metadata.py super.img --output report/lp-partitions.json
+      - name: Extract stock vendor_a (local read-only)
+        run: |
+          python3 tools/extract_lp_partition.py super.img --partition vendor_a --output vendor_a.img --report report/vendor-a-extraction.json
+          file vendor_a.img | tee report/vendor-a-file-type.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          h=Path('vendor_a.img').open('rb').read(4096)
+          Path('report/vendor-a-first64-hex.txt').write_text(h[:64].hex()+chr(10))
+          print('vendor_a first 64 bytes:', h[:64].hex())
+          PY
       - name: Upload metadata only, never firmware images
         if: always()
         uses: actions/upload-artifact@v4
