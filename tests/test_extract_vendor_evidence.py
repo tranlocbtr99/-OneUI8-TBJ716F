@@ -23,6 +23,20 @@ class ZipEvidenceTests(unittest.TestCase):
                              {"vendor_build_prop", "vintf_manifest"})
             self.assertFalse((root / "escape").exists())
 
+    def test_duplicate_vendor_entry_is_skipped(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            archive = root / 'duplicate.zip'
+            import warnings
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore', UserWarning)
+                with zipfile.ZipFile(archive, 'w') as z:
+                    z.writestr('vendor/build.prop', 'ro.product.model=TB-J716F')
+                    z.writestr('vendor/build.prop', 'ro.product.model=TB-J706F')
+            result = extract(archive, root / 'out')
+            self.assertEqual(len(result['files']), 1)
+            self.assertTrue(any('duplicate' in warning for warning in result['warnings']))
+
     def test_partition_image_only_reports_limitation(self):
         with tempfile.TemporaryDirectory() as temp:
             root = pathlib.Path(temp)
