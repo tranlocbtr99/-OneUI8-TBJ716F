@@ -30,6 +30,10 @@ jobs:
           curl --fail --location --proto '=https' --proto-redir '=https' \
             --retry 2 --connect-timeout 20 --max-time 1500 \
             --max-filesize 4294967296 --output firmware.zip "$URL"
+          bytes=$(stat -c%s firmware.zip)
+          if (( bytes > 4294967296 )); then
+            echo "Archive exceeds 4 GiB limit"; exit 1
+          fi
           echo "${EXPECTED,,}  firmware.zip" | sha256sum --check --status || {
             echo 'SHA-256 mismatch'; exit 1;
           }
