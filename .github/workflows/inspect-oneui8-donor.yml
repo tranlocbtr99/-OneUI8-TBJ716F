@@ -1,0 +1,47 @@
+name: Inspect verified One UI 8 donor image
+on:
+  workflow_dispatch:
+    inputs:
+      direct_url:
+        description: "Authorized direct HTTPS link to .img.zst (not Google Drive folder page)"
+        required: true
+        type: string
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install image inspection dependencies
+        run: sudo apt-get update && sudo apt-get install -y zstd e2fsprogs
+      - name: Download exact pinned donor and check checksum
+        env:
+          URL: ${{ inputs.direct_url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$URL" == https://* ]] || { echo "HTTPS required"; exit 1; }
+          mkdir -p donor-output
+          curl --fail --location --retry 2 --max-time 1800 --output donor.img.zst "$URL"
+          test "$(stat -c%s donor.img.zst)" -eq 2683294844 || { echo "Unexpected compressed size"; exit 1; }
+          echo "b9155186e0bf0ef88ef30181395c7be85f854edfe7bddccf6029a8941b8274b1  donor.img.zst" | sha256sum -c -
+      - name: Decompress and verify exact donor
+        shell: bash
+        run: |
+          set -euo pipefail
+          zstd -d --stdout donor.img.zst > donor.img
+          test "$(stat -c%s donor.img)" -eq 6845104128
+          echo "6946aa3fdcafa3475c1809b640f0df5c  donor.img" | md5sum -c -
+          python3 tools/verify_oneui8_donor.py donor.img --output donor-output/donor-preflight.json
+      - name: Inventory verified One UI 8 filesystem
+        run: python3 tools/inventory_oneui8_system_image.py donor.img --output donor-output/oneui8-donor-inventory.json
+      - name: Upload reports only, never proprietary images
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oneui8-donor-analysis
+          path: donor-output/*.json
+          if-no-files-found: ignore
+          retention-days: 7
