@@ -42,6 +42,7 @@ jobs:
           set -euo pipefail
           mkdir -p reports
           python3 tools/inventory_firmware_zip.py firmware.zip --output reports/firmware-zip-index.json
+          python3 tools/probe_partition_formats.py firmware.zip --output reports/image-format-hints.json
           python3 tools/extract_vendor_evidence.py firmware.zip --output-dir reports/vendor-evidence
           python3 - <<'PY'
           import json, pathlib, subprocess
@@ -65,4 +66,5 @@ jobs:
           name: firmware-zip-metadata
           path: |
             reports/firmware-zip-index.json
+            reports/image-format-hints.json
           if-no-files-found: error
