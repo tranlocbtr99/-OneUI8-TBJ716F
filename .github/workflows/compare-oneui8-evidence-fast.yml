@@ -43,6 +43,21 @@ jobs:
       - name: Produce HAL adaptation diagnostics
         run: |
           python3 tools/report_oneui8_hal_adaptation.py donor/oneui8-donor-inventory.json stock/vendor-vintf/manifest.xml --output report/hal-adaptation-diagnostics.json
+      - name: Classify HAL optionality using raw donor matrices when available
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p report/matrix-classification
+          found=0
+          for matrix in donor/raw-matrices/compatibility_matrix.*.xml; do
+            [ -f "$matrix" ] || continue
+            found=1
+            name="$(basename "$matrix" .xml)"
+            python3 tools/classify_oneui8_matrix_hals.py "$matrix" stock/vendor-vintf/manifest.xml --output "report/matrix-classification/$name.json"
+          done
+          if [ "$found" -eq 0 ]; then
+            echo 'Raw donor matrix XML absent from pinned older artifact; rerun inspect-oneui8-donor workflow and update donor run ID before classification' | tee report/matrix-classification/NOT_AVAILABLE.txt
+          fi
       - name: Upload small evidence report
         if: always()
         uses: actions/upload-artifact@v4
