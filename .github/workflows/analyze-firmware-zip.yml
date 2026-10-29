@@ -58,12 +58,11 @@ jobs:
               print('No directly extractable vendor evidence; see firmware-zip-index.json')
           PY
           # Only upload metadata reports; no extracted firmware blobs or proprietary properties.
-          rm -rf reports/vendor-evidence
+          rm -rf reports/vendor-evidence reports/vendor-inventory.json
       - name: Upload metadata reports
         uses: actions/upload-artifact@v4
         with:
           name: firmware-zip-metadata
           path: |
             reports/firmware-zip-index.json
-            reports/vendor-inventory.json
           if-no-files-found: error
