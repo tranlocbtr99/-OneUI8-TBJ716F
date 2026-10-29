@@ -1,0 +1,46 @@
+name: Compare One UI 8 and Lenovo VINTF evidence (fast)
+on:
+  workflow_dispatch:
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch previously verified small evidence artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p stock donor report
+          gh run download 40903127259 --repo "${{ github.repository }}" --name tbj716f-super-reconstruction-report --dir stock
+          gh run download 40831143271 --repo "${{ github.repository }}" --name oneui8-donor-analysis --dir donor
+          test -s stock/vendor-vintf/manifest.xml
+          test -s donor/oneui8-donor-inventory.json
+      - name: Compare and classify evidence without falsely failing extraction
+        shell: bash
+        run: |
+          set -uo pipefail
+          python3 tools/compare_oneui8_vendor_vintf.py donor/oneui8-donor-inventory.json stock/vendor-vintf/manifest.xml --output report/oneui8-preliminary-vintf-gap.json
+          rc=$?
+          echo "Comparator exit code: $rc" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$rc" -eq 2 ]; then
+            echo "### Inconclusive: insufficient matrix evidence, not a compatibility failure" >> "$GITHUB_STEP_SUMMARY"
+          elif [ "$rc" -eq 0 ]; then
+            echo "### Preliminary HAL name comparison completed (NOT boot approval)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### Comparator error: inspect the report" >> "$GITHUB_STEP_SUMMARY"
+            exit "$rc"
+          fi
+          cp stock/vendor-vintf/fragment-summary.json report/fragment-summary.json
+          cp stock/vendor-vintf/fragment-list.txt report/fragment-list.txt
+          cp stock/vendor-vintf/directory-list.txt report/directory-list.txt
+      - name: Upload small evidence report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oneui8-lenovo-vintf-evidence
+          path: report/
+          retention-days: 7
