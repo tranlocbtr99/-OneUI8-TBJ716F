@@ -58,7 +58,17 @@ jobs:
           else:
               print('No directly extractable vendor evidence; see firmware-zip-index.json')
           PY
-          # Only upload metadata reports; no extracted firmware blobs or proprietary properties.
+          # Identity report contains only selected model/API properties, not full vendor data.
+          python3 - <<'PY'
+          import json, pathlib, subprocess
+          files=json.loads(pathlib.Path('reports/vendor-evidence/evidence-index.json').read_text())['files']
+          props=[x['output'] for x in files if x['kind']=='vendor_build_prop']
+          if props:
+              subprocess.run(['python3','tools/check_firmware_identity.py',*props,'--output','reports/firmware-identity.json'],check=True)
+          else:
+              pathlib.Path('reports/firmware-identity.json').write_text(json.dumps({'identity_status':'identity_unverified','reason':'No directly extractable vendor build.prop'})+'\\n')
+          PY
+          # Only upload selected metadata reports; no extracted firmware blobs or full vendor properties.
           rm -rf reports/vendor-evidence reports/vendor-inventory.json
       - name: Upload metadata reports
         uses: actions/upload-artifact@v4
@@ -67,4 +77,5 @@ jobs:
           path: |
             reports/firmware-zip-index.json
             reports/image-format-hints.json
+            reports/firmware-identity.json
           if-no-files-found: error
