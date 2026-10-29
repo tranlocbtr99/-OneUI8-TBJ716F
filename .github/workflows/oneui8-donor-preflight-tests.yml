@@ -1,0 +1,18 @@
+name: One UI 8 donor preflight tests
+on:
+  push:
+    paths:
+      - 'tools/verify_oneui8_donor.py'
+      - 'tests/test_verify_oneui8_donor.py'
+      - '.github/workflows/oneui8-donor-preflight-tests.yml'
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test donor verification safety gates
+        run: python3 -m unittest discover -s tests -p 'test_verify_oneui8_donor.py' -v
