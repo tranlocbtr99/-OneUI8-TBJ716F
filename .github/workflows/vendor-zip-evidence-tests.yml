@@ -4,7 +4,9 @@ on:
   push:
     paths:
       - 'tools/extract_vendor_evidence.py'
+      - 'tools/inventory_firmware_zip.py'
       - 'tests/test_extract_vendor_evidence.py'
+      - 'tests/test_inventory_firmware_zip.py'
       - '.github/workflows/vendor-zip-evidence-tests.yml'
 jobs:
   test:
@@ -15,4 +17,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Test offline ZIP evidence extraction
-        run: python3 -m unittest discover -s tests -p 'test_extract_vendor_evidence.py' -v
+        run: |
+          python3 -m unittest discover -s tests -p 'test_extract_vendor_evidence.py' -v
+          python3 -m unittest discover -s tests -p 'test_inventory_firmware_zip.py' -v
