@@ -21,6 +21,8 @@ jobs:
           kernel=$(find /boot -maxdepth 1 -name 'vmlinuz-*-generic' -type f | sort -V | tail -1)
           test -n "$kernel"
           echo "kernel=$kernel" | tee output/inputs.txt
+          sudo install -m 0644 "$kernel" output/kernel-arm64.img
+          kernel=output/kernel-arm64.img
           file "$kernel" | tee -a output/inputs.txt
           ls -lh "$kernel" | tee -a output/inputs.txt
           # Diagnose whether Ubuntu's vmlinuz can be direct-loaded by QEMU.
