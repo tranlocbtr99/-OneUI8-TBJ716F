@@ -21,9 +21,9 @@ jobs:
           url='https://ports.ubuntu.com/ubuntu-ports/dists/noble-updates/main/binary-arm64/Packages.gz'
           data=gzip.decompress(urllib.request.urlopen(url,timeout=90).read()).decode()
           entries=[dict(line.split(': ',1) for line in para.splitlines() if ': ' in line)
-                   for para in data.split('\\n\\n') if para.startswith('Package: linux-image-')]
+                   for para in data.split(chr(10)*2) if para.startswith('Package: linux-image-')]
           entries=[e for e in entries if re.fullmatch(r'linux-image-[0-9].*-generic',e.get('Package',''))]
-          if not entries: raise SystemExit('No ARM64 generic kernel package in Ubuntu index')
+          if not entries:\n              print('Kernel package examples:',re.findall(r'^Package: (linux-image-[^\\n]+)',data,re.M)[:15])\n              raise SystemExit('No ARM64 generic kernel package in Ubuntu index')
           e=entries[-1]
           print('Selected package:',e['Package'],e.get('Version'))
           path=e['Filename']
