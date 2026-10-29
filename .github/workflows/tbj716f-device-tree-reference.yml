@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/tbj716f-device-tree-reference.yml'
       - 'tools/summarize_hal_inventory.py'
+      - 'tools/hal_review_queue.py'
 jobs:
   reference:
     runs-on: ubuntu-24.04
@@ -43,6 +44,9 @@ jobs:
           python3 tools/summarize_hal_inventory.py reference-vendor-inventory.json --output reference-hal-groups.json
           echo '### HAL categories (static declarations only)' >> "$GITHUB_STEP_SUMMARY"
           python3 tools/summarize_hal_inventory.py reference-vendor-inventory.json >> "$GITHUB_STEP_SUMMARY"
+      - name: Generate HAL review queue
+        run: |
+          python3 tools/hal_review_queue.py reference-hal-groups.json --output reference-hal-review.json
       - name: Upload reference report
         uses: actions/upload-artifact@v4
         with:
@@ -50,4 +54,5 @@ jobs:
           path: |
             reference-vendor-inventory.json
             reference-hal-groups.json
+            reference-hal-review.json
             reference-commit.txt
