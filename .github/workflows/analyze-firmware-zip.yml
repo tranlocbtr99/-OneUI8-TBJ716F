@@ -43,6 +43,7 @@ jobs:
           mkdir -p reports
           python3 tools/inventory_firmware_zip.py firmware.zip --output reports/firmware-zip-index.json
           python3 tools/probe_partition_formats.py firmware.zip --output reports/image-format-hints.json
+          python3 tools/inspect_sparse_structure.py firmware.zip --output reports/sparse-structure.json
           python3 tools/extract_vendor_evidence.py firmware.zip --output-dir reports/vendor-evidence
           python3 - <<'PY'
           import json, pathlib, subprocess
@@ -77,5 +78,6 @@ jobs:
           path: |
             reports/firmware-zip-index.json
             reports/image-format-hints.json
+            reports/sparse-structure.json
             reports/firmware-identity.json
           if-no-files-found: error
