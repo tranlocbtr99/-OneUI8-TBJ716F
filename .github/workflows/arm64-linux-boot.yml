@@ -1,0 +1,54 @@
+name: ARM64 Linux kernel boot
+on:
+  workflow_dispatch:
+jobs:
+  kernel-boot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Install ARM64 QEMU and Linux kernel
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends qemu-system-arm ipxe-qemu linux-image-generic
+      - name: Obtain Ubuntu ARM64 kernel and initrd
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 2 --max-time 180 -o arm64-netboot.tar.gz https://cdimage.ubuntu.com/netboot/noble/arm64/netboot.tar.gz
+          tar -tzf arm64-netboot.tar.gz | grep -E '(linux|initrd)' | head -30
+          mkdir -p netboot
+          tar -xzf arm64-netboot.tar.gz -C netboot
+          KERNEL=$(find netboot -type f -name 'linux' | head -1)
+          INITRD=$(find netboot -type f -name 'initrd.gz' | head -1)
+          test -s "$KERNEL" && test -s "$INITRD"
+          cp "$KERNEL" kernel-arm64
+          cp "$INITRD" initrd-arm64.gz
+          file kernel-arm64 initrd-arm64.gz
+      - name: Boot ARM64 kernel under QEMU TCG
+        run: |
+          set -euo pipefail
+          set +e
+          timeout 100s qemu-system-aarch64 \
+            -machine virt -cpu cortex-a57 -accel tcg -m 2048 -smp 2 \
+            -nodefaults -nographic -monitor none -serial mon:stdio \
+            -kernel kernel-arm64 -initrd initrd-arm64.gz \
+            -append 'console=ttyAMA0 earlycon=pl011,0x9000000 loglevel=7' \
+            > arm64-linux-boot.log 2>&1
+          rc=$?
+          set -e
+          tail -n 120 arm64-linux-boot.log
+          echo "QEMU exit: $rc (124 means expected timeout)"
+          if grep -Eq 'Linux version |Booting Linux on physical CPU' arm64-linux-boot.log; then
+            echo 'PASS: ARM64 Linux kernel executed under QEMU'
+          else
+            echo 'FAIL: no ARM64 Linux kernel execution marker'
+            exit 1
+          fi
+      - name: Upload diagnostic log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arm64-linux-boot-log
+          path: arm64-linux-boot.log
+          if-no-files-found: ignore
