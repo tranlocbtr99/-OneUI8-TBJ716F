@@ -92,6 +92,8 @@ jobs:
               (Path('donor-output/raw-matrices')/f'compatibility_matrix.{level}.xml').write_bytes(result.stdout)
               print('Preserved',path)
           PY
+      - name: Extract additional VINTF metadata from verified donor
+        run: python3 tools/extract_oneui8_additional_vintf.py donor.img --output donor-output/additional-vintf
       - name: Upload reports only, never proprietary images
         if: always()
         uses: actions/upload-artifact@v4
