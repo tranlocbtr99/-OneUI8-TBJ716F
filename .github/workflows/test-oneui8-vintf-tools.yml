@@ -1,0 +1,47 @@
+name: Validate One UI 8 VINTF analysis tools
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'tools/classify_oneui8_matrix_hals.py'
+      - 'tools/audit_oneui8_hal_evidence.py'
+      - 'tests/test_classify_oneui8_matrix_hals.py'
+      - '.github/workflows/test-oneui8-vintf-tools.yml'
+jobs:
+  unit-tests:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run HAL classification unit tests
+        run: python3 -m unittest discover -s tests -p 'test_classify_oneui8_matrix_hals.py' -v
+      - name: Verify fail-closed audit with synthetic matrix
+        run: |
+          python3 - <<'PY'
+          import json
+          import tempfile
+          from pathlib import Path
+          from tools.audit_oneui8_hal_evidence import audit
+          with tempfile.TemporaryDirectory() as d:
+              p=Path(d)
+              (p/'compatibility_matrix.5.json').write_text(json.dumps({
+                  'framework_level':'5',
+                  'hal_entries':[{'optionality_status':'unspecified'}]
+              }))
+              result=audit(p)
+              assert result['compatibility_verified'] is False
+              assert result['boot_verified'] is False
+              assert result['matrices'][0]['unspecified']==1
+              (p/'compatibility_matrix.5.json').write_text(json.dumps({
+                  'framework_level':'5',
+                  'hal_entries':[{'optionality_status':'invalid'}]
+              }))
+              try:
+                  audit(p)
+              except ValueError:
+                  pass
+              else:
+                  raise AssertionError('Audit accepted invalid HAL classification')
+          print('Fail-closed audit tests passed')
+          PY
