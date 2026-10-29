@@ -1,0 +1,106 @@
+name: ARM64 Linux userspace smoke
+on:
+  workflow_dispatch:
+jobs:
+  kernel-boot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Install ARM64 QEMU and Linux kernel
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends qemu-system-arm ipxe-qemu zstd gcc-aarch64-linux-gnu libc6-dev-arm64-cross cpio
+      - name: Obtain Ubuntu ARM64 kernel from official archive
+        run: |
+          set -euo pipefail
+          mkdir -p kernel-pkg
+          python3 - <<'PY'
+          import gzip,urllib.request,re
+          url='https://ports.ubuntu.com/ubuntu-ports/dists/noble-updates/main/binary-arm64/Packages.gz'
+          data=gzip.decompress(urllib.request.urlopen(url,timeout=90).read()).decode()
+          entries=[dict(line.split(': ',1) for line in para.splitlines() if ': ' in line)
+                   for para in data.split(chr(10)*2) if para.startswith('Package: linux-image-')]
+          entries=[e for e in entries if re.fullmatch(r'linux-image-[0-9].*-generic',e.get('Package',''))]
+          if not entries:
+              print('Kernel package examples:', [x for x in re.findall(r'^Package: (linux-image-[^\\n]+)', data, re.M)[:15]])
+              raise SystemExit('No ARM64 generic kernel package in Ubuntu index')
+          e=entries[-1]
+          print('Selected package:',e['Package'],e.get('Version'))
+          path=e['Filename']
+          urllib.request.urlretrieve('https://ports.ubuntu.com/ubuntu-ports/'+path,'kernel.deb')
+          PY
+          dpkg-deb -x kernel.deb kernel-pkg
+          KERNEL=$(find kernel-pkg/boot -type f -name 'vmlinuz-*' | head -1)
+          test -s "$KERNEL"
+          cp "$KERNEL" kernel-arm64
+          file kernel-arm64
+          # QEMU 8.2 direct boot cannot unpack zstd EFI zboot images.
+          # Extract the documented payload, verify bounds and decompress.
+          python3 - <<'PY'
+          from pathlib import Path
+          import struct
+          data=Path('kernel-arm64').read_bytes()
+          assert data[:2]==b'MZ' and data[4:8]==b'zimg', 'Not an EFI zboot image'
+          offset,size=struct.unpack_from('<II',data,8)
+          compression=data[24:56].split(bytes([0]),1)[0]
+          assert offset>=56 and size>0 and offset+size<=len(data), 'Invalid zboot payload bounds'
+          assert compression==b'zstd', f'Unexpected compression: {compression!r}'
+          Path('kernel-payload.zst').write_bytes(data[offset:offset+size])
+          print('Verified EFI zboot payload:',size,'bytes,',compression.decode())
+          PY
+          zstd -d -f kernel-payload.zst -o kernel-uncompressed
+          file kernel-uncompressed
+          test -s kernel-uncompressed
+      - name: Build minimal ARM64 initramfs
+        run: |
+          set -euo pipefail
+          mkdir -p rootfs/dev rootfs/proc rootfs/sys
+          cat > init.c <<'EOF'
+          #include <fcntl.h>
+          #include <unistd.h>
+          int main(void) {
+              int fd = open("/dev/console", O_WRONLY);
+              const char msg[] = "ARM64_USERSPACE_REACHED\n";
+              if (fd >= 0) { write(fd, msg, sizeof(msg)-1); close(fd); }
+              for (;;) sleep(10);
+          }
+          EOF
+          aarch64-linux-gnu-gcc -static -Os -o rootfs/init init.c
+          file rootfs/init
+          (cd rootfs && find . -print0 | cpio --null -ov --format=newc 2>/dev/null) | gzip -9 > rootfs.cpio.gz
+          test -s rootfs.cpio.gz
+      - name: Boot ARM64 kernel under QEMU TCG
+        run: |
+          set -euo pipefail
+          set +e
+          timeout 65s qemu-system-aarch64 \
+            -machine virt -cpu cortex-a57 -accel tcg -m 2048 -smp 2 \
+            -nodefaults -nographic -monitor none -serial mon:stdio \
+            -kernel kernel-uncompressed -initrd rootfs.cpio.gz \
+            -append 'console=ttyAMA0 earlycon=pl011,0x9000000 loglevel=7 panic=-1' \
+            > arm64-linux-boot.log 2>&1
+          rc=$?
+          set -e
+          tail -n 120 arm64-linux-boot.log
+          echo "QEMU exit: $rc (124 means expected timeout)"
+          if grep -Eq 'Linux version |Booting Linux on physical CPU' arm64-linux-boot.log; then
+            echo 'PASS: ARM64 Linux kernel executed under QEMU'
+          else
+            echo 'FAIL: no ARM64 Linux kernel execution marker'
+            exit 1
+          fi
+          if grep -q 'ARM64_USERSPACE_REACHED' arm64-linux-boot.log; then
+            echo 'PASS: ARM64 init process executed under QEMU'
+          else
+            echo 'FAIL: ARM64 init process marker missing'
+            exit 1
+          fi
+      - name: Upload diagnostic log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arm64-linux-userspace-log
+          path: arm64-linux-boot.log
+          if-no-files-found: ignore
