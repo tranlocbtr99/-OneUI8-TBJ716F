@@ -23,7 +23,9 @@ jobs:
           entries=[dict(line.split(': ',1) for line in para.splitlines() if ': ' in line)
                    for para in data.split(chr(10)*2) if para.startswith('Package: linux-image-')]
           entries=[e for e in entries if re.fullmatch(r'linux-image-[0-9].*-generic',e.get('Package',''))]
-          if not entries:\n              print('Kernel package examples:',re.findall(r'^Package: (linux-image-[^\\n]+)',data,re.M)[:15])\n              raise SystemExit('No ARM64 generic kernel package in Ubuntu index')
+          if not entries:
+              print('Kernel package examples:', [x for x in re.findall(r'^Package: (linux-image-[^\\n]+)', data, re.M)[:15]])
+              raise SystemExit('No ARM64 generic kernel package in Ubuntu index')
           e=entries[-1]
           print('Selected package:',e['Package'],e.get('Version'))
           path=e['Filename']
