@@ -24,10 +24,18 @@ class OneUI8CompatibilityTests(unittest.TestCase):
         result = assess({"system_partition_capacity_bytes": 2_000_000_000})
         self.assertEqual(result["checks"][4]["status"], "fail")
 
+    def test_vendor_api_without_runtime_evidence_requires_review(self):
+        result = assess({"vendor_api_level": 34})
+        self.assertEqual(result["checks"][2]["status"], "review")
+
+    def test_old_free_space_field_does_not_count_as_capacity(self):
+        result = assess({"system_partition_free_bytes": 9_000_000_000})
+        self.assertEqual(result["checks"][4]["status"], "unknown")
+
     def test_all_static_evidence_passes_but_no_boot_claim(self):
         result = assess({"model": "TB-J716F", "supported_abis": ["arm64-v8a"],
                          "vendor_api_level": 34, "vendor_runtime_verified": True, "vintf_compatible": True,
-                         "system_partition_free_bytes": 7_000_000_000,
+                         "system_partition_capacity_bytes": 7_000_000_000,
                          "verified_recovery_path": True})
         self.assertTrue(result["ready_for_device_trial"])
         self.assertIn("never proves boot", result["note"])
