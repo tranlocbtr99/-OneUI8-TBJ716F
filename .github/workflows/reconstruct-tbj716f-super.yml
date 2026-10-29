@@ -1,0 +1,35 @@
+name: Reconstruct TB-J716F super (read-only)
+on:
+  workflow_dispatch:
+jobs:
+  reconstruct:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download public TB-J716F firmware
+        run: |
+          curl --fail --location --retry 2 --proto '=https' --proto-redir '=https' --max-time 3000 --output stock.zip 'https://mirrors-obs-1.lolinet.com/firmware/lenowow/2021/Tab_P11_Pro_2021/TB-J716F/TB-J716F_CN_OPEN_USER_Q00209.3_R_ZUI_13.0.430_ST_220113_qpst.zip'
+          unzip -tq stock.zip
+      - name: Reconstruct and inspect local super
+        run: |
+          mkdir -p report
+          python3 tools/reconstruct_qfil_super.py stock.zip --output super.img --report report/super-reconstruction.json
+          file super.img | tee report/super-file-type.txt
+          sha256sum super.img > report/super-sha256.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          h=Path('super.img').open('rb').read(4096)
+          print('First 64 bytes:', h[:64].hex())
+          Path('report/super-first64-hex.txt').write_text(h[:64].hex()+'\\n')
+          PY
+      - name: Upload metadata only, never firmware images
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tbj716f-super-reconstruction-report
+          path: report/
+          if-no-files-found: ignore
+          retention-days: 7
