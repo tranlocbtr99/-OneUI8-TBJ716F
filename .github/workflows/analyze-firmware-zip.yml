@@ -1,0 +1,69 @@
+name: Analyze TB-J716F firmware ZIP (read-only)
+on:
+  workflow_dispatch:
+    inputs:
+      archive_url:
+        description: 'Direct HTTPS URL to an authorized firmware ZIP (no login/cookies)'
+        required: true
+        type: string
+      expected_sha256:
+        description: 'Verified SHA-256 of the ZIP (64 hexadecimal characters)'
+        required: true
+        type: string
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate input and download bounded archive
+        env:
+          URL: ${{ inputs.archive_url }}
+          EXPECTED: ${{ inputs.expected_sha256 }}
+        run: |
+          set -euo pipefail
+          [[ "$URL" == https://* ]] || { echo 'HTTPS required'; exit 1; }
+          [[ "$EXPECTED" =~ ^[0-9a-fA-F]{64}$ ]] || { echo 'Invalid SHA-256'; exit 1; }
+          # Do not follow redirects to a different protocol.
+          curl --fail --location --proto '=https' --proto-redir '=https' \
+            --retry 2 --connect-timeout 20 --max-time 1500 \
+            --max-filesize 4294967296 --output firmware.zip "$URL"
+          echo "${EXPECTED,,}  firmware.zip" | sha256sum --check --status || {
+            echo 'SHA-256 mismatch'; exit 1;
+          }
+          python3 - <<'PY'
+          import zipfile
+          assert zipfile.is_zipfile('firmware.zip'), 'Downloaded file is not a ZIP archive'
+          PY
+      - name: Inventory ZIP and extract bounded plain-text evidence
+        run: |
+          set -euo pipefail
+          mkdir -p reports
+          python3 tools/inventory_firmware_zip.py firmware.zip --output reports/firmware-zip-index.json
+          python3 tools/extract_vendor_evidence.py firmware.zip --output-dir reports/vendor-evidence
+          python3 - <<'PY'
+          import json, pathlib, subprocess
+          files=json.loads(pathlib.Path('reports/vendor-evidence/evidence-index.json').read_text())['files']
+          args=['python3','tools/vendor_inventory.py']
+          for item in files:
+              if item['kind']=='vendor_build_prop' and '--vendor-build-prop' not in args:
+                  args += ['--vendor-build-prop',item['output']]
+              elif item['kind']=='vintf_manifest':
+                  args += ['--manifest',item['output']]
+          if len(args)>2:
+              subprocess.run(args+['--output','reports/vendor-inventory.json'],check=True)
+          else:
+              print('No directly extractable vendor evidence; see firmware-zip-index.json')
+          PY
+          # Only upload metadata reports; no extracted firmware blobs or proprietary properties.
+          rm -rf reports/vendor-evidence
+      - name: Upload metadata reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-zip-metadata
+          path: |
+            reports/firmware-zip-index.json
+            reports/vendor-inventory.json
+          if-no-files-found: error
