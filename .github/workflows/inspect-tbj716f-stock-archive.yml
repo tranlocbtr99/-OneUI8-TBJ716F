@@ -42,6 +42,8 @@ jobs:
           Path("stock-report/stock-archive-inventory.json").write_text(json.dumps(out,indent=2)+"\\n")
           print(json.dumps(out["vendor_candidates"], indent=2))
           PY
+      - name: Inspect rawprogram super segment map
+        run: python3 tools/inspect_qfil_rawprogram.py stock.zip --output stock-report/rawprogram-super-map.json
       - name: Upload metadata only
         if: always()
         uses: actions/upload-artifact@v4
