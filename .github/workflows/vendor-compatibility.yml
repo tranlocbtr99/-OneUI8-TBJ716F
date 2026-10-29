@@ -1,0 +1,17 @@
+name: Vendor compatibility inventory tests
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'tools/vendor_inventory.py'
+      - 'tests/test_vendor_inventory.py'
+      - '.github/workflows/vendor-compatibility.yml'
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run offline inventory unit tests
+        run: python3 -m unittest discover -s tests -p 'test_vendor_inventory.py' -v
