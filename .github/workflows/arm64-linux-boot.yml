@@ -44,7 +44,7 @@ jobs:
           data=Path('kernel-arm64').read_bytes()
           assert data[:2]==b'MZ' and data[4:8]==b'zimg', 'Not an EFI zboot image'
           offset,size=struct.unpack_from('<II',data,8)
-          compression=data[24:56].split(b'\\0',1)[0]
+          compression=data[24:56].split(bytes([0]),1)[0]
           assert offset>=56 and size>0 and offset+size<=len(data), 'Invalid zboot payload bounds'
           assert compression==b'zstd', f'Unexpected compression: {compression!r}'
           Path('kernel-payload.zst').write_bytes(data[offset:offset+size])
