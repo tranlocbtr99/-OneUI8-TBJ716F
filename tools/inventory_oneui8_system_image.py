@@ -8,6 +8,7 @@ import json
 import re
 import shutil
 import subprocess
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 FILES = {
@@ -20,7 +21,22 @@ FILES = {
     "samsung_audio_effects": "/system/etc/audio_effects_sec.xml",
     "init_rc": "/system/etc/init/hw/init.rc",
 }
+for level in range(1, 9):
+    FILES[f"framework_matrix_level_{level}"] = f"/system/etc/vintf/compatibility_matrix.{level}.xml"
+FILES["product_matrix"] = "/system/product/etc/vintf/compatibility_matrix.xml"
+FILES["system_ext_matrix"] = "/system/system_ext/etc/vintf/compatibility_matrix.xml"
 MAX_CAPTURE = 1024 * 1024
+
+def summarize_vintf(xml):
+    try:
+        root = ET.fromstring(xml)
+    except ET.ParseError as exc:
+        return {"parse_error": str(exc)}
+    hals = [name.text for hal in root.findall("hal") for name in hal.findall("name") if name.text]
+    return {"root_tag": root.tag, "type": root.attrib.get("type"),
+            "level": root.attrib.get("level"),
+            "hal_count": len(hals), "hal_names": sorted(set(hals))}
+
 
 def read_file(image, filename):
     # debugfs -R cat only reads the filesystem; no loop mount or image modification.
@@ -58,8 +74,8 @@ def inventory(image):
                 entry["dolby_stage_tokens"] = len(re.findall(r"STAGE_EFFECT_DOLBY\w*", data))
             else:
                 entry["bytes"] = info["bytes"]
-                if name in ("framework_manifest", "framework_matrix", "system_ext_manifest"):
-                    entry["xml_start"] = data[:400]
+                if "/vintf/" in path and path.endswith(".xml"):
+                    entry["vintf_summary"] = summarize_vintf(data)
         else:
             entry["reason"] = info["reason"]
         result["files"][name] = entry
