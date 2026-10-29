@@ -1,0 +1,18 @@
+name: One UI 8 TB-J716F compatibility tests
+on:
+  push:
+    paths:
+      - 'tools/check_oneui8_tbj716f_compatibility.py'
+      - 'tests/test_oneui8_tbj716f_compatibility.py'
+      - '.github/workflows/oneui8-tbj716f-compatibility.yml'
+  workflow_dispatch:
+jobs:
+  unit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run One UI 8 TB-J716F compatibility tests
+        run: python3 -m unittest discover -s tests -p 'test_oneui8_tbj716f_compatibility.py' -v
