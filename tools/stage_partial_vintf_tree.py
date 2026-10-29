@@ -23,7 +23,16 @@ def stage(donor_dir, stock_dir, output_dir):
     target=output_dir/"vendor"/"etc"/"vintf"/"manifest.xml"
     target.parent.mkdir(parents=True,exist_ok=True)
     shutil.copyfile(vendor,target)
-    report={"matrices":[p.name for p in matrices],"vendor_manifest":str(vendor),
+    additional=donor_dir/"additional-vintf"
+    copied=[]
+    for key,relative in (("system_manifest","system/etc/vintf/manifest.xml"),("system_matrix","system/etc/vintf/compatibility_matrix.xml"),("product_manifest","product/etc/vintf/manifest.xml"),("product_matrix","product/etc/vintf/compatibility_matrix.xml"),("system_ext_manifest","system_ext/etc/vintf/manifest.xml"),("system_ext_matrix","system_ext/etc/vintf/compatibility_matrix.xml")):
+        source=additional/(key+".xml")
+        if source.is_file():
+            destination=output_dir/relative
+            destination.parent.mkdir(parents=True,exist_ok=True)
+            shutil.copyfile(source,destination)
+            copied.append(relative)
+    report={"matrices":[p.name for p in matrices],"vendor_manifest":str(vendor),"additional_vintf_files":copied,
             "complete_vintf_tree":False,"checkvintf_passed":None,"flashable":False,
             "limitations":["Only extracted framework matrices and base vendor manifest are present",
                            "Missing system/product/system_ext matrices and manifest fragments, kernel metadata and runtime properties",
