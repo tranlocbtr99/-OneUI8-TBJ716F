@@ -17,12 +17,14 @@ def vendor_hals(xml_text):
     return {node.text.strip() for hal in root.findall("hal")
             for node in hal.findall("name") if node.text and node.text.strip()}
 
-def compare(inventory, manifest_text):
+def compare(inventory, manifest_text, fcm_level=None):
     vendor = vendor_hals(manifest_text)
     found = {}
     matrix_count = 0
+    if fcm_level is None:
+        return {"status": "vendor_fcm_level_required", "warning": "Specify the vendor target-level; do not combine matrices from different FCM levels."}
     for key, entry in inventory.get("files", {}).items():
-        if not ("matrix" in key and entry.get("present")):
+        if key != f"framework_matrix_level_{fcm_level}" or not entry.get("present"):
             continue
         summary = entry.get("vintf_summary", {})
         if summary.get("parse_error") or summary.get("root_tag") != "compatibility-matrix":
@@ -34,6 +36,7 @@ def compare(inventory, manifest_text):
     return {
         "status": "preliminary" if matrix_count else "insufficient_framework_matrix_evidence",
         "framework_matrices_parsed": matrix_count,
+        "selected_vendor_fcm_level": fcm_level,
         "vendor_hal_names": len(vendor),
         "framework_hal_names": len(required),
         "name_matches": sorted(required & vendor),
@@ -49,9 +52,10 @@ def main():
     p.add_argument("donor_inventory", type=Path)
     p.add_argument("vendor_manifest_xml", type=Path)
     p.add_argument("--output", type=Path, default=Path("oneui8-tbj716f-vintf-gaps.json"))
+    p.add_argument("--vendor-fcm-level", type=int, choices=range(1, 9), required=True)
     args = p.parse_args()
     result = compare(json.loads(args.donor_inventory.read_text(encoding="utf-8")),
-                     args.vendor_manifest_xml.read_text(encoding="utf-8"))
+                     args.vendor_manifest_xml.read_text(encoding="utf-8"), args.vendor_fcm_level)
     args.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(result, indent=2))
     if result["status"] != "preliminary":
