@@ -24,7 +24,7 @@ def probe(path):
             if valid:
                 copy = bytearray(block[:size])
                 stored = bytes(copy[8:40])
-                copy[8:40] = b"\\x00" * 32
+                copy[8:40] = bytes(32)
                 checksum_ok = hashlib.sha256(copy).digest() == stored
             results.append({"offset": offset, "magic": hex(magic),
                             "geometry_size": size, "valid": valid and checksum_ok,
@@ -38,7 +38,7 @@ if __name__ == "__main__":
     p.add_argument("--output", type=Path, required=True)
     args = p.parse_args()
     result = probe(args.image)
-    args.output.write_text(json.dumps(result, indent=2)+"\\n")
+    args.output.write_text(json.dumps(result, indent=2)+chr(10))
     print(json.dumps(result, indent=2))
     if not result["has_valid_geometry"]:
         raise SystemExit("No verified LP geometry at standard offsets; investigate reconstruction/base offset.")
