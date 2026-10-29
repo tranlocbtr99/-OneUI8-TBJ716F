@@ -1,0 +1,50 @@
+name: One UI 8 vendor manifest inspection
+on:
+  workflow_dispatch:
+    inputs:
+      vendor_manifest_url:
+        description: "Public HTTPS direct URL to TB-J716F vendor manifest.xml (no credentials)"
+        required: true
+        type: string
+      donor_inventory_artifact_run_id:
+        description: "Successful donor analysis run ID"
+        required: false
+        default: "40831143271"
+        type: string
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retrieve verified donor metadata artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.donor_inventory_artifact_run_id }}
+        run: |
+          set -euo pipefail
+          [[ "$RUN_ID" =~ ^[0-9]+$ ]] || exit 2
+          gh run download "$RUN_ID" --repo "${{ github.repository }}" --name oneui8-donor-analysis --dir evidence
+          test -s evidence/oneui8-donor-inventory.json
+      - name: Fetch vendor manifest with strict size cap
+        env:
+          MANIFEST_URL: ${{ inputs.vendor_manifest_url }}
+        run: |
+          set -euo pipefail
+          [[ "$MANIFEST_URL" == https://* ]] || exit 2
+          curl --fail --location --proto '=https' --proto-redir '=https' --max-time 60 --max-filesize 1048576 --output evidence/vendor-manifest.xml "$MANIFEST_URL"
+          test -s evidence/vendor-manifest.xml
+      - name: Compare only selected vendor FCM level
+        run: |
+          python3 tools/compare_oneui8_vendor_vintf.py evidence/oneui8-donor-inventory.json evidence/vendor-manifest.xml --output evidence/vintf-gap-report.json
+      - name: Upload metadata report only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oneui8-tbj716f-vintf-gap-report
+          path: evidence/vintf-gap-report.json
+          if-no-files-found: ignore
+          retention-days: 7
