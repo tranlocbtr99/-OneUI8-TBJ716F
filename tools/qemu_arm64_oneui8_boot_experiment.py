@@ -45,10 +45,15 @@ def main():
             code=None
     log=a.log.read_bytes()[-1048576:].decode("utf-8","replace")
     # A boot requires a guest-side positive signal; timeout/console activity is NOT success.
+    # Serial text alone is untrusted evidence; it may be printed by init scripts.
+    # Never treat a generic marker as a verified Android userspace boot.
     markers=["sys.boot_completed=1","BOOT_COMPLETED=1"]
-    guest_reported_boot=any(x in log for x in markers)
+    serial_boot_marker_observed=any(x in log for x in markers)
+    guest_reported_boot=False
     result={"qemu_exit_code":code,"timed_out":timed_out,
             "guest_reported_boot":guest_reported_boot,
+            "serial_boot_marker_observed":serial_boot_marker_observed,
+            "boot_verification_method":"not_available_without_guest_adb_or_authenticated_agent",
             "device_compatibility_verified":False,"flashable":False,
             "note":"QEMU virt differs from TB-J716F; generic serial boot markers are not sufficient hardware validation.",
             "log":str(a.log)}
