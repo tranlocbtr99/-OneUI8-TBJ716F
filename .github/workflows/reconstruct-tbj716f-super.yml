@@ -89,7 +89,7 @@ jobs:
               if proc.returncode or not dest.is_file() or not dest.stat().st_size:
                   raise SystemExit(f'Unable to read VINTF fragment {name}: {proc.stderr}')
               status.append({'file':name,'bytes':dest.stat().st_size})
-          Path('report/vendor-vintf/fragment-summary.json').write_text(json.dumps(status,indent=2)+chr(10))
+          Path('report/vendor-vintf/fragment-summary.json').write_text(json.dumps({'discovered':names,'extracted':status,'directory_listing':listing},indent=2)+chr(10))
           print('Extracted vendor manifest fragments:',len(status))
           PY
       - name: Compare stock Lenovo VINTF against One UI 8 donor
