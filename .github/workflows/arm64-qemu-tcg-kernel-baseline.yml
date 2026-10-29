@@ -18,7 +18,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p output
-          kernel=$(find /boot -maxdepth 1 -name 'vmlinuz-*' -type f | sort -V | tail -1)
+          kernel=$(find /boot -maxdepth 1 -name 'vmlinuz-*-generic' -type f | sort -V | tail -1)
           test -n "$kernel"
           echo "kernel=$kernel" | tee output/inputs.txt
           qemu-system-aarch64 --version | tee -a output/inputs.txt
@@ -32,6 +32,9 @@ jobs:
           code=$?
           set -e
           echo "$code" > output/qemu-exit-code.txt
+          echo "QEMU exit code: $code"
+          echo "Serial log (last 100 lines):"
+          tail -n 100 output/serial.log || true
           python3 - <<'PY'
           import json
           from pathlib import Path
@@ -44,6 +47,7 @@ jobs:
             "kvm_used":False,
             "expected_kernel_panic_without_android_initramfs":True,
             "qemu_exit_code":Path('output/qemu-exit-code.txt').read_text().strip(),
+            "serial_log_tail":log[-2500:],
             "interpretation":"Linux kernel execution proves only QEMU TCG baseline, not Android or One UI compatibility."
           }
           Path('output/result.json').write_text(json.dumps(result,indent=2)+'\n')
