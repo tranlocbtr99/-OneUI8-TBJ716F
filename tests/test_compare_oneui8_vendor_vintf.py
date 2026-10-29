@@ -21,9 +21,17 @@ class VintfGapTests(unittest.TestCase):
         self.assertEqual(compare({"files": {}}, VENDOR, 6)["status"],
                          "insufficient_framework_matrix_evidence")
 
-    def test_vendor_level_must_be_explicit(self):
+    def test_vendor_level_auto_detected(self):
         result = compare({"files": {}}, VENDOR)
-        self.assertEqual(result["status"], "vendor_fcm_level_required")
+        self.assertEqual(result["selected_vendor_fcm_level"], 6)
+
+    def test_vendor_level_mismatch_rejected(self):
+        with self.assertRaises(ValueError):
+            compare({"files": {}}, VENDOR, 7)
+
+    def test_vendor_level_missing_rejected(self):
+        with self.assertRaises(ValueError):
+            compare({"files": {}}, VENDOR.replace(' target-level="6"', ""))
 
     def test_does_not_mix_fcm_levels(self):
         donor = {"files": {"framework_matrix_level_6": {
