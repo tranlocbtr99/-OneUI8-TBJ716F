@@ -44,6 +44,12 @@ def compare(inventory, manifest_text, fcm_level=None):
         for name in summary.get("hal_names", []):
             found.setdefault(name, []).append(key)
     required = set(found)
+    all_matrices = {}
+    for key, entry in inventory.get("files", {}).items():
+        if "matrix" not in key or not entry.get("present"):
+            continue
+        summary = entry.get("vintf_summary", {})
+        all_matrices[key] = {"xml_level": summary.get("level"), "hal_count": summary.get("hal_count"), "hal_names": summary.get("hal_names", []), "parse_error": summary.get("parse_error")}
     levels = {}
     for key, entry in inventory.get("files", {}).items():
         if key.startswith("framework_matrix_level_") and entry.get("present"):
@@ -55,6 +61,8 @@ def compare(inventory, manifest_text, fcm_level=None):
     return {
         "status": "preliminary" if matrix_count and required else "insufficient_framework_matrix_evidence",
         "framework_matrices_parsed": matrix_count,
+        "donor_matrix_inventory": all_matrices,
+        "selected_matrix_empty": bool(matrix_count and not required),
         "donor_matrix_diagnostics": levels,
         "selected_matrix_empty": bool(matrix_count and not required),
         "selected_vendor_fcm_level": fcm_level,
