@@ -1,0 +1,55 @@
+name: ROM preflight
+on:
+  workflow_dispatch:
+    inputs:
+      image_url:
+        description: 'Optional direct HTTPS ROM image URL (trusted source only)'
+        required: false
+        type: string
+      sha256:
+        description: 'Expected SHA-256 for downloaded file (required with URL)'
+        required: false
+        type: string
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate optional inputs
+        env:
+          IMAGE_URL: ${{ inputs.image_url }}
+          EXPECTED_SHA256: ${{ inputs.sha256 }}
+        run: |
+          python3 - <<'PY'
+          import os,re,sys,urllib.parse
+          url=os.environ.get("IMAGE_URL","").strip()
+          sha=os.environ.get("EXPECTED_SHA256","").strip()
+          if bool(url)!=bool(sha): sys.exit("Both URL and SHA-256 are required together")
+          if url and (urllib.parse.urlparse(url).scheme!="https" or not re.fullmatch(r"[a-fA-F0-9]{64}",sha)):
+              sys.exit("Expected HTTPS URL and 64-digit SHA-256")
+          print("Inputs valid; download requested:", bool(url))
+          PY
+      - name: Download and verify image if provided
+        env:
+          IMAGE_URL: ${{ inputs.image_url }}
+          EXPECTED_SHA256: ${{ inputs.sha256 }}
+        run: |
+          if [ -n "$IMAGE_URL" ]; then
+            curl --fail --location --retry 2 --max-time 1200 --output rom.bin "$IMAGE_URL"
+            echo "$EXPECTED_SHA256  rom.bin" | sha256sum --check
+            file rom.bin
+            ls -lh rom.bin
+          else
+            echo "No image supplied: environment-only preflight."
+          fi
+      - name: Report environment
+        run: |
+          uname -a
+          df -h .
+          free -h
+          command -v qemu-system-aarch64 || true
+          test -e /dev/kvm && echo KVM-present || echo KVM-unavailable
+          echo "Preflight only; no ROM boot attempted."
