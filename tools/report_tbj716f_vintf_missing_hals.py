@@ -8,11 +8,11 @@ import json
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-def parse_hals(paths):
+def parse_hals(paths, expected_root):
     result = []
     for path in paths:
         root = ET.parse(path).getroot()
-        for hal in root.findall("hal"):
+        if root.tag != expected_root:\n            raise ValueError(f"{path}: expected <{expected_root}>, got <{root.tag}>")\n        for hal in root.findall("hal"):
             name = hal.findtext("name")
             if not name:
                 continue
