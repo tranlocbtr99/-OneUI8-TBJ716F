@@ -11,15 +11,30 @@ class VintfGapTests(unittest.TestCase):
         donor = {"files": {"framework_matrix_level_6": {
             "present": True, "vintf_summary": {"root_tag": "compatibility-matrix",
             "hal_names": ["android.hardware.audio", "android.hardware.camera"]}}}}
-        result = compare(donor, VENDOR)
+        result = compare(donor, VENDOR, 6)
         self.assertEqual(result["name_matches"], ["android.hardware.audio"])
         self.assertEqual(result["names_not_declared_in_vendor_manifest"][0]["hal"],
                          "android.hardware.camera")
         self.assertEqual(result["status"], "preliminary")
 
     def test_no_matrix_is_not_pass(self):
-        self.assertEqual(compare({"files": {}}, VENDOR)["status"],
+        self.assertEqual(compare({"files": {}}, VENDOR, 6)["status"],
                          "insufficient_framework_matrix_evidence")
+
+    def test_vendor_level_must_be_explicit(self):
+        result = compare({"files": {}}, VENDOR)
+        self.assertEqual(result["status"], "vendor_fcm_level_required")
+
+    def test_does_not_mix_fcm_levels(self):
+        donor = {"files": {"framework_matrix_level_6": {
+            "present": True, "vintf_summary": {"root_tag": "compatibility-matrix",
+            "hal_names": ["android.hardware.audio"]}},
+            "framework_matrix_level_7": {
+            "present": True, "vintf_summary": {"root_tag": "compatibility-matrix",
+            "hal_names": ["android.hardware.camera.provider"]}}}}
+        result = compare(donor, VENDOR, 6)
+        self.assertEqual(result["framework_hal_names"], 1)
+        self.assertEqual(result["names_not_declared_in_vendor_manifest"], [])
 
     def test_invalid_vendor_type_rejected(self):
         with self.assertRaises(ValueError):
