@@ -21,6 +21,17 @@ jobs:
           kernel=$(find /boot -maxdepth 1 -name 'vmlinuz-*-generic' -type f | sort -V | tail -1)
           test -n "$kernel"
           echo "kernel=$kernel" | tee output/inputs.txt
+          file "$kernel" | tee -a output/inputs.txt
+          ls -lh "$kernel" | tee -a output/inputs.txt
+          # Diagnose whether Ubuntu's vmlinuz can be direct-loaded by QEMU.
+          python3 - "$kernel" <<'PY'
+          import sys
+          from pathlib import Path
+          data=Path(sys.argv[1]).read_bytes()
+          print("kernel bytes:",len(data))
+          print("first 64 bytes:",data[:64].hex())
+          print("ARM64 Image magic at 0x38:",data[56:60].hex())
+          PY
           qemu-system-aarch64 --version | tee -a output/inputs.txt
           set +e
           timeout --signal=TERM --kill-after=5s 90s qemu-system-aarch64 \
