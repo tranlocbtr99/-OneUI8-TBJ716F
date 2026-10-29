@@ -63,6 +63,8 @@ jobs:
       - name: Stage partial VINTF filesystem for future official validation
         run: |
           python3 tools/stage_partial_vintf_tree.py donor stock report/vintf-partial-tree
+      - name: Analyze framework manifest HAL declarations
+        run: python3 tools/analyze_oneui8_framework_manifests.py report/vintf-partial-tree --output report/framework-manifest-hal-analysis.json
       - name: Upload small evidence report
         if: always()
         uses: actions/upload-artifact@v4
