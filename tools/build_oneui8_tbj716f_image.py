@@ -16,6 +16,11 @@ def digest(p):
     with p.open("rb") as f:
         for b in iter(lambda:f.read(8*1024*1024),b""):h.update(b)
     return h.hexdigest()
+def md5_file(path):
+    h=hashlib.md5()
+    with path.open("rb") as f:
+        for block in iter(lambda:f.read(8*1024*1024),b""):h.update(block)
+    return h.hexdigest()
 def run(*args):
     p=subprocess.run(args,capture_output=True,text=True)
     if p.returncode:raise RuntimeError("command failed: "+" ".join(map(str,args))+"\n"+p.stderr[-1500:])
@@ -28,7 +33,7 @@ def build(donor,overlay,output,report):
     if set(files)!={PREFIX+"port-metadata.json",PREFIX+"README.txt"}:raise ValueError("Unexpected overlay file list")
     if not donor.is_file():raise ValueError("Donor image missing")
     if donor.stat().st_size!=6845104128:raise ValueError("Unexpected donor image size")
-    if hashlib.md5(donor.read_bytes()).hexdigest()!="6946aa3fdcafa3475c1809b640f0df5c":raise ValueError("Donor MD5 mismatch")
+    if md5_file(donor)!="6946aa3fdcafa3475c1809b640f0df5c":raise ValueError("Donor MD5 mismatch")
     for name,expected in files.items():
         p=overlay/name
         if not p.is_file() or p.is_symlink() or digest(p)!=expected:raise ValueError("Overlay integrity failure: "+name)
@@ -37,7 +42,8 @@ def build(donor,overlay,output,report):
     output.parent.mkdir(parents=True,exist_ok=True)
     try:
         shutil.copyfile(donor,output)
-        run("e2fsck","-fn",str(output))
+        pre=subprocess.run(["e2fsck","-fn",str(output)],capture_output=True,text=True)
+        if pre.returncode not in (0,1):raise RuntimeError("Donor filesystem check failed: "+pre.stdout[-1200:])
         for folder in ("/system/etc/oneui8-tbj716f",):
             p=subprocess.run(["debugfs","-w","-R","mkdir "+folder,str(output)],capture_output=True,text=True)
             if "File exists" not in p.stderr and p.returncode:raise RuntimeError(p.stderr)
