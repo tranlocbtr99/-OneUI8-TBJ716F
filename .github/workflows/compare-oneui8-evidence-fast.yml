@@ -40,6 +40,9 @@ jobs:
           cp stock/vendor-vintf/fragment-summary.json report/fragment-summary.json
           cp stock/vendor-vintf/fragment-list.txt report/fragment-list.txt
           cp stock/vendor-vintf/directory-list.txt report/directory-list.txt
+      - name: Produce HAL adaptation diagnostics
+        run: |
+          python3 tools/report_oneui8_hal_adaptation.py donor/oneui8-donor-inventory.json stock/vendor-vintf/manifest.xml --output report/hal-adaptation-diagnostics.json
       - name: Upload small evidence report
         if: always()
         uses: actions/upload-artifact@v4
