@@ -58,6 +58,8 @@ jobs:
           if [ "$found" -eq 0 ]; then
             echo 'Raw donor matrix XML absent from pinned older artifact; rerun inspect-oneui8-donor workflow and update donor run ID before classification' | tee report/matrix-classification/NOT_AVAILABLE.txt
           fi
+      - name: Audit classified HAL evidence
+        run: python3 tools/audit_oneui8_hal_evidence.py report/matrix-classification --output report/hal-evidence-audit.json
       - name: Upload small evidence report
         if: always()
         uses: actions/upload-artifact@v4
