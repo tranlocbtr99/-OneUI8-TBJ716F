@@ -7,6 +7,7 @@ jobs:
     timeout-minutes: 65
     permissions:
       contents: read
+      actions: read
     steps:
       - uses: actions/checkout@v4
       - name: Download public TB-J716F firmware
@@ -69,6 +70,16 @@ jobs:
           if not result['target_level'] or not hals:
               raise SystemExit('Stock manifest lacks target-level or HAL entries')
           PY
+      - name: Compare stock Lenovo VINTF against One UI 8 donor
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p donor-evidence
+          gh run download 40831143271 --repo "${{ github.repository }}" --name oneui8-donor-analysis --dir donor-evidence
+          test -s donor-evidence/oneui8-donor-inventory.json
+          python3 tools/compare_oneui8_vendor_vintf.py donor-evidence/oneui8-donor-inventory.json report/vendor-vintf/manifest.xml --output report/vendor-vintf/oneui8-preliminary-vintf-gap.json
       - name: Upload metadata only, never firmware images
         if: always()
         uses: actions/upload-artifact@v4
