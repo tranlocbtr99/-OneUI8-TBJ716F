@@ -11,7 +11,7 @@ jobs:
       - name: Install ARM64 emulator and firmware
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends qemu-system-arm qemu-efi-aarch64
+          sudo apt-get install -y --no-install-recommends qemu-system-arm qemu-efi-aarch64 ipxe-qemu
       - name: Verify emulator and firmware
         run: |
           qemu-system-aarch64 --version
@@ -24,7 +24,7 @@ jobs:
           FW=$(find /usr/share -type f \( -name 'QEMU_EFI.fd' -o -name 'AAVMF_CODE.fd' \) | head -1)
           test -n "$FW"
           set +e
-          timeout 25s qemu-system-aarch64 -M virt -cpu cortex-a57 -m 1024 -smp 2 -nographic -monitor none -serial stdio -bios "$FW" > qemu-boot.log 2>&1
+          timeout 25s qemu-system-aarch64 -M virt -cpu cortex-a57 -m 1024 -smp 2 -nodefaults -nographic -monitor none -serial stdio -bios "$FW" > qemu-boot.log 2>&1
           code=$?
           set -e
           cat qemu-boot.log
