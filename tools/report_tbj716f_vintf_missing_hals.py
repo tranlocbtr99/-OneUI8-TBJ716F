@@ -12,7 +12,9 @@ def parse_hals(paths, expected_root):
     result = []
     for path in paths:
         root = ET.parse(path).getroot()
-        if root.tag != expected_root:\n            raise ValueError(f"{path}: expected <{expected_root}>, got <{root.tag}>")\n        for hal in root.findall("hal"):
+        if root.tag != expected_root:
+            raise ValueError(f"{path}: expected <{expected_root}>, got <{root.tag}>")
+        for hal in root.findall("hal"):
             name = hal.findtext("name")
             if not name:
                 continue
@@ -44,8 +46,8 @@ def main():
     vendors = sorted(a.vendor_manifests.rglob("*.xml"))
     if not matrices or not vendors:
         ap.error("Both directories must contain extracted XML files")
-    required = parse_hals(matrices)
-    declared = parse_hals(vendors)
+    required = parse_hals(matrices, "compatibility-matrix")
+    declared = parse_hals(vendors, "manifest")
     vendor_names = {(x["name"], x["format"]) for x in declared}
     missing = [x for x in required if not x["optional"] and (x["name"], x["format"]) not in vendor_names]
     shared = [x for x in required if (x["name"], x["format"]) in vendor_names]
