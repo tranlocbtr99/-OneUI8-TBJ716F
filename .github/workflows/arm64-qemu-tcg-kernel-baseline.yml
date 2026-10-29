@@ -12,7 +12,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update -qq
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends qemu-system-arm linux-image-virtual
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends qemu-system-arm qemu-system-data ipxe-qemu linux-image-virtual
       - name: Boot an ARM64 Linux kernel in QEMU TCG
         shell: bash
         run: |
@@ -24,8 +24,8 @@ jobs:
           qemu-system-aarch64 --version | tee -a output/inputs.txt
           set +e
           timeout --signal=TERM --kill-after=5s 90s qemu-system-aarch64 \
-            -machine virt,accel=tcg -cpu cortex-a72 -smp 2 -m 2048 \
-            -nographic -monitor none -no-reboot \
+            -machine virt,accel=tcg -cpu cortex-a72 -smp 2 -m 2048 -nodefaults -serial mon:stdio \
+            -display none -no-reboot \
             -kernel "$kernel" \
             -append 'console=ttyAMA0 earlycon=pl011,0x9000000 loglevel=7 panic=-1' \
             > output/serial.log 2>&1
