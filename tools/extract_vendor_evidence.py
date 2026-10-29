@@ -22,12 +22,17 @@ def extract(path, dest):
     items, warnings, total = [], [], 0
     with zipfile.ZipFile(path) as archive:
         candidates = []
+        seen = set()
         for info in archive.infolist():
             name = info.filename
             if info.is_dir() or not SAFE.fullmatch(name) or ".." in name.split("/"):
                 continue
             kind = "vendor_build_prop" if VENDOR_PROP.search(name) else "vintf_manifest" if MANIFEST.search(name) else None
             if kind:
+                if name in seen:
+                    warnings.append(f"Skipped duplicate ZIP member: {name}")
+                    continue
+                seen.add(name)
                 candidates.append((info, kind))
         for idx, (info, kind) in enumerate(candidates):
             if info.file_size > MAX_ENTRY or total + info.file_size > MAX_TOTAL:
