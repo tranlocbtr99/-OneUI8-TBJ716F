@@ -7,6 +7,19 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "tools"))
 import inventory_oneui8_system_image as inv
 
 class ImageInventoryTests(unittest.TestCase):
+    def test_numbered_vintf_matrices_are_included(self):
+        self.assertEqual(inv.FILES["framework_matrix_level_6"],
+                         "/system/etc/vintf/compatibility_matrix.6.xml")
+
+    def test_vintf_hal_summary(self):
+        xml = '<compatibility-matrix type="framework" level="6"><hal><name>android.hardware.audio</name></hal></compatibility-matrix>'
+        summary = inv.summarize_vintf(xml)
+        self.assertEqual(summary["hal_names"], ["android.hardware.audio"])
+        self.assertEqual(summary["level"], "6")
+
+    def test_malformed_vintf_is_reported(self):
+        self.assertIn("parse_error", inv.summarize_vintf("<manifest>"))
+
     def test_reject_non_ext4(self):
         with tempfile.TemporaryDirectory() as d:
             p = pathlib.Path(d) / "image.img"
