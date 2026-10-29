@@ -1,0 +1,19 @@
+name: TB-J716F VINTF triage regression
+on:
+  push:
+    paths:
+      - 'tools/report_tbj716f_vintf_missing_hals.py'
+      - 'tests/test_tbj716f_vintf_triage.py'
+      - '.github/workflows/tbj716f-vintf-triage-test.yml'
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Python syntax
+        run: python3 -m py_compile tools/report_tbj716f_vintf_missing_hals.py
+      - name: Validate VINTF parsing
+        run: python3 -m unittest discover -s tests -p 'test_tbj716f_vintf_triage.py' -v
