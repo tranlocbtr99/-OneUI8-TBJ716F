@@ -52,6 +52,24 @@ jobs:
           python3 tools/verify_oneui8_donor.py donor.img --output donor-output/donor-preflight.json
       - name: Inventory verified One UI 8 filesystem
         run: python3 tools/inventory_oneui8_system_image.py donor.img --output donor-output/oneui8-donor-inventory.json
+      - name: Summarize VINTF framework matrices
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("donor-output/oneui8-donor-inventory.json").read_text())
+          matrices = {}
+          for key, item in report["files"].items():
+              if "matrix" in key and item.get("present"):
+                  matrices[key] = item.get("vintf_summary", {})
+          out = {"framework_matrices": matrices,
+                 "warning": "Metadata only; no vendor comparison or boot validation"}
+          Path("donor-output/oneui8-vintf-matrices.json").write_text(
+              json.dumps(out, indent=2) + "\\n")
+          print(json.dumps(out, indent=2))
+          PY
       - name: Upload reports only, never proprietary images
         if: always()
         uses: actions/upload-artifact@v4
