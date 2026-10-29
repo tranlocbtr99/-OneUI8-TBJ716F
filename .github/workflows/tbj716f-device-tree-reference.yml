@@ -1,0 +1,46 @@
+name: TB-J716F device tree reference inventory
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/tbj716f-device-tree-reference.yml'
+jobs:
+  reference:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download public device tree (reference only)
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/ISNing/android_device_lenovo_J716F.git reference-tree
+          git -C reference-tree rev-parse HEAD > reference-commit.txt
+      - name: Inventory public VINTF and properties
+        run: |
+          set -euo pipefail
+          args=()
+          if [ -f reference-tree/vendor.prop ]; then
+            args+=(--vendor-build-prop reference-tree/vendor.prop)
+          fi
+          while IFS= read -r -d '' file; do
+            args+=(--manifest "$file")
+          done < <(find reference-tree/configs/vintf -type f -name '*.xml' -print0 2>/dev/null || true)
+          if [ "${#args[@]}" -eq 0 ]; then
+            echo 'No recognized reference files'; exit 1
+          fi
+          python3 tools/vendor_inventory.py "${args[@]}" --output reference-vendor-inventory.json
+          {
+            echo '## TB-J716F device tree reference'
+            echo 'Source: https://github.com/ISNing/android_device_lenovo_J716F'
+            echo "Commit: $(cat reference-commit.txt)"
+            echo '**Warning: community device tree, NOT extracted ZUI 15 firmware, NOT proof of One UI 8 compatibility.**'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload reference report
+        uses: actions/upload-artifact@v4
+        with:
+          name: tbj716f-reference-inventory
+          path: |
+            reference-vendor-inventory.json
+            reference-commit.txt
