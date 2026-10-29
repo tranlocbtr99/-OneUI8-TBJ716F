@@ -1,0 +1,91 @@
+name: Android ROM image preflight
+on:
+  workflow_dispatch:
+    inputs:
+      image_url:
+        description: 'Direct HTTPS URL of an authorized Android image archive (optional)'
+        required: false
+        type: string
+      expected_sha256:
+        description: 'SHA256 digest of archive (required when URL is provided)'
+        required: false
+        type: string
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Validate inputs and set research-only scope
+        env:
+          IMAGE_URL: ${{ inputs.image_url }}
+          EXPECTED_SHA256: ${{ inputs.expected_sha256 }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$IMAGE_URL" ]]; then
+            echo "No image supplied. Running offline tooling validation only."
+            echo "SKIP_DOWNLOAD=1" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          [[ "$IMAGE_URL" =~ ^https:// ]] || { echo "Only HTTPS download URLs accepted"; exit 1; }
+          [[ "$EXPECTED_SHA256" =~ ^[a-fA-F0-9]{64}$ ]] || { echo "A valid SHA256 is mandatory"; exit 1; }
+          echo "SKIP_DOWNLOAD=0" >> "$GITHUB_ENV"
+      - name: Install image inspection tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends file unzip p7zip-full e2fsprogs python3
+          command -v file
+          command -v unzip
+          command -v 7z
+          command -v dumpe2fs
+      - name: Download and verify source archive
+        if: env.SKIP_DOWNLOAD == '0'
+        env:
+          IMAGE_URL: ${{ inputs.image_url }}
+          EXPECTED_SHA256: ${{ inputs.expected_sha256 }}
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 --connect-timeout 20 --max-time 900 --max-filesize 4294967296 -o source-image.bin "$IMAGE_URL"
+          printf '%s  %s\n' "$EXPECTED_SHA256" source-image.bin | sha256sum -c -
+          file source-image.bin | tee source-type.txt
+          sha256sum source-image.bin | tee source-sha256.txt
+      - name: Inspect archive metadata without extracting or flashing
+        if: env.SKIP_DOWNLOAD == '0'
+        run: |
+          set -euo pipefail
+          if 7z l source-image.bin > archive-list.txt 2>&1; then
+            echo "Archive listing produced."
+            head -n 100 archive-list.txt
+          else
+            echo "Not a supported archive; file type retained for manual research."
+            cat source-type.txt
+          fi
+          echo "No image is flashed, repacked, or executed."
+      - name: Summarize findings
+        if: always()
+        run: |
+          {
+            echo "## Android ROM preflight (research only)"
+            echo "- Target: Lenovo TB-J716F (Snapdragon 870)"
+            echo "- This job does not prove Android 16 / One UI 8 boot compatibility."
+            echo "- No device operations, flashing, or image modification."
+            if [[ -f source-sha256.txt ]]; then
+              echo "- Verified archive SHA256:"
+              cat source-sha256.txt
+            else
+              echo "- No verified source archive in this run."
+            fi
+          } | tee preflight-summary.md
+          cat preflight-summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload inspection report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-rom-preflight-report
+          path: |
+            preflight-summary.md
+            source-type.txt
+            source-sha256.txt
+            archive-list.txt
+          if-no-files-found: ignore
