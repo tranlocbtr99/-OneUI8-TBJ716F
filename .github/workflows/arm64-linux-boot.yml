@@ -11,20 +11,29 @@ jobs:
       - name: Install ARM64 QEMU and Linux kernel
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends qemu-system-arm ipxe-qemu linux-image-generic
-      - name: Obtain Ubuntu ARM64 kernel and initrd
+          sudo apt-get install -y --no-install-recommends qemu-system-arm ipxe-qemu
+      - name: Obtain Ubuntu ARM64 kernel from official archive
         run: |
           set -euo pipefail
-          curl --fail --location --retry 2 --max-time 180 -o arm64-netboot.tar.gz https://cdimage.ubuntu.com/netboot/noble/arm64/netboot.tar.gz
-          tar -tzf arm64-netboot.tar.gz | grep -E '(linux|initrd)' | head -30
-          mkdir -p netboot
-          tar -xzf arm64-netboot.tar.gz -C netboot
-          KERNEL=$(find netboot -type f -name 'linux' | head -1)
-          INITRD=$(find netboot -type f -name 'initrd.gz' | head -1)
-          test -s "$KERNEL" && test -s "$INITRD"
+          mkdir -p kernel-pkg
+          python3 - <<'PY'
+          import gzip,urllib.request,re
+          url='https://ports.ubuntu.com/ubuntu-ports/dists/noble-updates/main/binary-arm64/Packages.gz'
+          data=gzip.decompress(urllib.request.urlopen(url,timeout=90).read()).decode()
+          entries=[dict(line.split(': ',1) for line in para.splitlines() if ': ' in line)
+                   for para in data.split('\\n\\n') if para.startswith('Package: linux-image-')]
+          entries=[e for e in entries if re.fullmatch(r'linux-image-[0-9].*-generic',e.get('Package',''))]
+          if not entries: raise SystemExit('No ARM64 generic kernel package in Ubuntu index')
+          e=entries[-1]
+          print('Selected package:',e['Package'],e.get('Version'))
+          path=e['Filename']
+          urllib.request.urlretrieve('https://ports.ubuntu.com/ubuntu-ports/'+path,'kernel.deb')
+          PY
+          dpkg-deb -x kernel.deb kernel-pkg
+          KERNEL=$(find kernel-pkg/boot -type f -name 'vmlinuz-*' | head -1)
+          test -s "$KERNEL"
           cp "$KERNEL" kernel-arm64
-          cp "$INITRD" initrd-arm64.gz
-          file kernel-arm64 initrd-arm64.gz
+          file kernel-arm64
       - name: Boot ARM64 kernel under QEMU TCG
         run: |
           set -euo pipefail
@@ -32,8 +41,8 @@ jobs:
           timeout 100s qemu-system-aarch64 \
             -machine virt -cpu cortex-a57 -accel tcg -m 2048 -smp 2 \
             -nodefaults -nographic -monitor none -serial mon:stdio \
-            -kernel kernel-arm64 -initrd initrd-arm64.gz \
-            -append 'console=ttyAMA0 earlycon=pl011,0x9000000 loglevel=7' \
+            -kernel kernel-arm64 \
+            -append 'console=ttyAMA0 earlycon=pl011,0x9000000 loglevel=7 panic=-1' \
             > arm64-linux-boot.log 2>&1
           rc=$?
           set -e
