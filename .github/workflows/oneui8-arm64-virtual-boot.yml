@@ -20,9 +20,15 @@ on:
       virtual_vendor_sha256:
         description: SHA256 of virtual vendor
         required: true
+      system_url:
+        description: HTTPS URL of One UI 8 raw ext4 system image (not a .zst file)
+        required: true
+      system_sha256:
+        description: SHA256 of the raw One UI 8 system image
+        required: true
 jobs:
   virtual-boot:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 60
     permissions:
       actions: read
@@ -41,9 +47,11 @@ jobs:
           INITRD_SHA: ${{ inputs.initrd_sha256 }}
           VENDOR_URL: ${{ inputs.virtual_vendor_url }}
           VENDOR_SHA: ${{ inputs.virtual_vendor_sha256 }}
+          SYSTEM_URL: ${{ inputs.system_url }}
+          SYSTEM_SHA: ${{ inputs.system_sha256 }}
         run: |
           set -euo pipefail
-          for item in KERNEL INITRD VENDOR; do
+          for item in KERNEL INITRD VENDOR SYSTEM; do
             urlvar="${item}_URL"; hashvar="${item}_SHA"
             url="${!urlvar}"; sha="${!hashvar}"
             [[ "$url" == https://* ]] || { echo "HTTPS only"; exit 1; }
@@ -55,17 +63,11 @@ jobs:
           echo "$KERNEL_SHA  Image" | sha256sum -c -
           echo "$INITRD_SHA  ramdisk.img" | sha256sum -c -
           echo "$VENDOR_SHA  virtual-vendor.img" | sha256sum -c -
-      - name: Retrieve previously built engineering image
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          gh run download 40916705889 --repo "$GITHUB_REPOSITORY" --name oneui8-tbj716f-engineering-NOT-FLASHABLE --dir engineering
-          zstd -d engineering/tbj716f-oneui8-engineering.img.zst -o engineering/system.img
-          echo 'cf3a6fdb29e5f42c36ec8dc2687380b89c38e8dfd5e9b570741f0b62b60b3c77  engineering/system.img' | sha256sum -c -
+          curl --fail --location --retry 2 --max-time 1800 "$SYSTEM_URL" -o system.img
+          echo "$SYSTEM_SHA  system.img" | sha256sum -c -
       - name: Attempt isolated ARM64 virtual boot
         run: |
-          python3 tools/qemu_arm64_oneui8_boot_experiment.py --kernel Image --initrd ramdisk.img --system engineering/system.img --vendor virtual-vendor.img --seconds 180 --log output/qemu-console.log --result output/boot-result.json
+          python3 tools/qemu_arm64_oneui8_boot_experiment.py --kernel Image --initrd ramdisk.img --system system.img --vendor virtual-vendor.img --seconds 180 --log output/qemu-console.log --result output/boot-result.json
       - name: Upload virtual boot evidence only
         if: always()
         uses: actions/upload-artifact@v4
