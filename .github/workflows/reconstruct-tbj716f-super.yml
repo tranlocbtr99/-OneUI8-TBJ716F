@@ -30,6 +30,8 @@ jobs:
         run: python3 tools/probe_lp_geometry.py super.img --output report/lp-geometry.json
       - name: Validate LP metadata tables and enumerate vendor extents
         run: python3 tools/inspect_lp_metadata.py super.img --output report/lp-partitions.json
+      - name: Report logical partition extent budget
+        run: python3 tools/report_lp_partition_budget.py report/lp-partitions.json --output report/lp-partition-budget.json
       - name: Extract stock vendor_a (local read-only)
         run: |
           python3 tools/extract_lp_partition.py super.img --partition vendor_a --output vendor_a.img --report report/vendor-a-extraction.json
