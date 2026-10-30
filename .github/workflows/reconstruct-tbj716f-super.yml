@@ -21,11 +21,36 @@ jobs:
           set -euo pipefail
           mkdir -p report
           python3 tools/inspect_stock_super_chunk_headers.py stock.zip --output report/super-segment-headers.json
-          if unzip -Z1 stock.zip | grep -Fxq 'rawprogram_unsparse0.xml'; then
+          python3 - <<'PY'
+          import json,struct,zipfile,xml.etree.ElementTree as ET
+          from pathlib import Path
+          with zipfile.ZipFile('stock.zip') as z:
+              members=set(z.namelist())
+              name='rawprogram_unsparse0.xml'
+              result={'xml_present':name in members,'segments':[],'reconstruction_supported':False}
+              if name in members:
+                  root=ET.fromstring(z.read(name))
+                  for node in root.iter('program'):
+                      a=node.attrib
+                      if a.get('label','').lower()!='super' or not a.get('filename'):
+                          continue
+                      fn=a['filename']
+                      record={'file':fn,'start_sector':a.get('start_sector'),'sectors':a.get('num_partition_sectors'),'sector_bytes':a.get('SECTOR_SIZE_IN_BYTES'),'present':fn in members}
+                      if fn in members:
+                          with z.open(fn) as src:
+                              record['android_sparse']=src.read(4)==struct.pack('<I',0xED26FF3A)
+                          record['file_bytes']=z.getinfo(fn).file_size
+                      result['segments'].append(record)
+              result['reconstruction_supported']=bool(result['segments']) and all(x['present'] and not x['android_sparse'] for x in result['segments'])
+              Path('report/reconstruction-preflight.json').write_text(json.dumps(result,indent=2)+chr(10))
+              Path('report/reconstruction-supported.txt').write_text('true' if result['reconstruction_supported'] else 'false')
+              print(json.dumps(result,indent=2))
+          PY
+          if [[ "$(cat report/reconstruction-supported.txt)" == "true" ]]; then
             echo 'reconstruct=true' >> "$GITHUB_OUTPUT"
           else
             echo 'reconstruct=false' >> "$GITHUB_OUTPUT"
-            printf '%s\\n' 'SKIPPED: rawprogram_unsparse0.xml is absent; current reconstruction tool requires an explicit per-segment sector map. No image guessed or flashed.' > report/reconstruction-preflight.txt
+            printf '%s\\n' 'SKIPPED: missing sector mapping, missing segments, or Android sparse input unsupported by the current raw-only reconstruction tool. No image guessed or flashed.' > report/reconstruction-preflight.txt
             cat report/reconstruction-preflight.txt >> "$GITHUB_STEP_SUMMARY"
           fi
       - name: Reconstruct and inspect local super
