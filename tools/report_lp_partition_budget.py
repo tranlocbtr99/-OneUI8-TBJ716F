@@ -35,8 +35,8 @@ def summarize(data, super_bytes, donor_bytes):
     by_name = {e["name"]: e for e in entries}
     if len(by_name) != len(entries):
         raise ValueError("duplicate partition names")
-    system_candidates = [e for e in entries if e["name"] in ("system_a", "system")]
-    other = [e for e in entries if e["name"] not in ("system_a", "system")]
+    system_candidates = [e for e in entries if e["name"] in ("system_a", "system_b", "system")]
+    other = [e for e in entries if e["name"] not in ("system_a", "system_b", "system")]
     total = sum(e["allocated_bytes"] for e in entries)
     physical_total = sum(e["physical_linear_bytes"] for e in entries)
     return {"super_bytes": super_bytes, "donor_image_bytes": donor_bytes,
@@ -47,6 +47,7 @@ def summarize(data, super_bytes, donor_bytes):
             "non_system_linear_physical_bytes": sum(e["physical_linear_bytes"] for e in other),
             "system_partition_candidates": system_candidates,
             "status": "evidence_only_not_flashable",
+            "ab_slot_accounting": "not_verified",
             "warning": "Nominal estimate includes zero-filled extents and may double-count A/B slots. Physical linear extents are reported separately. Metadata groups, slot sharing, sparse used blocks and actual usable capacity must be verified before repartition."}
 
 if __name__ == "__main__":
