@@ -35,11 +35,14 @@ def inspect_zip(path, prefix="super", limit=4096):
                 if len(header)<28:
                     raise ValueError("Truncated Android sparse header: "+info.filename)
                 major,minor,file_hdr,chunk_hdr,block,total_blocks,total_chunks,checksum=struct.unpack_from("<HHHHIIII",header,4)
+                plausible=(major==1 and file_hdr>=28 and chunk_hdr>=12 and block>=512 and
+                           block<=1048576 and block&(block-1)==0 and total_blocks>0 and
+                           total_chunks>0 and file_hdr<=info.file_size)
                 sparse_info={"major":major,"minor":minor,"file_header_size":file_hdr,
                              "chunk_header_size":chunk_hdr,"block_size":block,
                              "total_blocks":total_blocks,"total_chunks":total_chunks,
                              "declared_output_bytes":block*total_blocks,
-                             "header_plausible":major==1 and file_hdr>=28 and chunk_hdr>=12 and block>=512 and block&(block-1)==0}
+                             "header_plausible":plausible}
             found.append({"archive_path":info.filename,"segment_index":index,
                           "zip_member_bytes":info.file_size,"first_bytes_sha256":hashlib.sha256(header).hexdigest(),
                           "first_32_hex":header[:32].hex(),"format":"android_sparse" if sparse else "unknown_or_raw",
