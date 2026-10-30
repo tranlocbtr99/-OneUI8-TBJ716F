@@ -8,6 +8,8 @@ on:
       - 'tests/test_stock_inventory_artifact.py'
       - 'tools/check_tbj716f_super_budget.py'
       - 'tests/test_tbj716f_super_budget.py'
+      - 'tools/report_lp_partition_budget.py'
+      - 'tests/test_lp_partition_budget.py'
       - '.github/workflows/test-stock-inventory-audit.yml'
   workflow_dispatch:
 permissions:
