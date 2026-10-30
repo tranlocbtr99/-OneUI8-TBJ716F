@@ -1,6 +1,10 @@
 name: Inspect real One UI 8 donor VINTF
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - 'tools/extract_donor_vintf_debugfs.py'
+      - '.github/workflows/inspect-oneui8-donor-vintf.yml'
 jobs:
   inspect:
     runs-on: ubuntu-24.04
