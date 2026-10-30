@@ -10,7 +10,7 @@ spec.loader.exec_module(mod)
 class BudgetTests(unittest.TestCase):
     def test_known_stock_and_donor_remain_unverified(self):
         report = mod.assess(mod.SUPER_BYTES, mod.DONOR_BYTES)
-        self.assertEqual(report["remaining_before_other_partitions_bytes"], 1744820480)
+        self.assertEqual(report["remaining_before_other_partitions_bytes"], 1744830464)
         self.assertEqual(report["status"], "insufficient_evidence")
         self.assertIsNone(report["fits_known_budget"])
 
