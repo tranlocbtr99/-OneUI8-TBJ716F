@@ -53,6 +53,37 @@ jobs:
           Path("stock-report/stock-archive-inventory.json").write_text(json.dumps(out,indent=2)+"\n")
           print(json.dumps(out["vendor_candidates"], indent=2))
           PY
+      - name: Audit unsparse super sector map (metadata only)
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json,zipfile,xml.etree.ElementTree as ET
+          from pathlib import Path
+          results=[]
+          with zipfile.ZipFile('stock.zip') as z:
+              members=set(z.namelist())
+              for name in ('rawprogram_unsparse0.xml','rawprogram_unsparse0_fullupgrade.xml'):
+                  if name not in members:
+                      results.append({'xml':name,'present':False})
+                      continue
+                  root=ET.fromstring(z.read(name))
+                  entries=[]
+                  for node in root.iter('program'):
+                      a=node.attrib
+                      if a.get('label','').lower()!='super':
+                          continue
+                      record={key:a.get(key) for key in ('filename','start_sector','num_partition_sectors','SECTOR_SIZE_IN_BYTES','file_sector_offset','sparse','physical_partition_number')}
+                      fn=record['filename']
+                      record['file_present']=fn in members
+                      if fn in members:
+                          record['file_bytes']=z.getinfo(fn).file_size
+                      entries.append(record)
+                  results.append({'xml':name,'present':True,'super_entries':entries})
+          Path('stock-report/unsparse-super-sector-map.json').write_text(json.dumps(results,indent=2)+chr(10))
+          print(json.dumps(results,indent=2))
+          if not any(x.get('super_entries') for x in results):
+              raise SystemExit('No explicit super entries in unsparse XML')
+          PY
       - name: Inspect rawprogram super segment map
         run: python3 tools/inspect_qfil_rawprogram.py stock.zip --output stock-report/rawprogram-super-map.json
       - name: Inspect actual super segment headers (read-only)
