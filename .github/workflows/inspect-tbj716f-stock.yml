@@ -1,6 +1,9 @@
 name: Inspect TB-J716F stock vendor
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/inspect-tbj716f-stock.yml'
 jobs:
   inspect:
     runs-on: ubuntu-24.04
