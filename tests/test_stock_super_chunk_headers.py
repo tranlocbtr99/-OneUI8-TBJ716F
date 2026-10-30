@@ -30,6 +30,20 @@ class ChunkHeaderTests(unittest.TestCase):
         self.assertTrue(result["segments"][0]["sparse_header"]["header_plausible"])
         self.assertFalse(result["image_reconstruction_authorized"])
 
+    def test_first_sparse_chunk_raw_size(self):
+        header=struct.pack("<IHHHHIIII",0xed26ff3a,1,0,28,12,4096,1,1,0)
+        chunk=struct.pack("<HHII",0xCAC1,0,1,4108)
+        result=mod.inspect_zip(self.archive({"super_1.img":header+chunk+b"x"*4096}))
+        first=result["segments"][0]["sparse_header"]["first_chunk"]
+        self.assertEqual(first["type"],"raw")
+        self.assertTrue(first["size_plausible"])
+
+    def test_first_sparse_chunk_malformed_size(self):
+        header=struct.pack("<IHHHHIIII",0xed26ff3a,1,0,28,12,4096,1,1,0)
+        chunk=struct.pack("<HHII",0xCAC1,0,1,12)
+        result=mod.inspect_zip(self.archive({"super_1.img":header+chunk}))
+        self.assertFalse(result["segments"][0]["sparse_header"]["first_chunk"]["size_plausible"])
+
     def test_zero_chunks_sparse_not_plausible(self):
         sparse=struct.pack("<IHHHHIIII",0xed26ff3a,1,0,28,12,4096,16,0,0)
         result=mod.inspect_zip(self.archive({"super_1.img":sparse}))
