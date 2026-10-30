@@ -1,0 +1,39 @@
+name: Inspect real One UI 8 donor VINTF
+on:
+  workflow_dispatch:
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install extraction dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y zstd e2fsprogs
+          python3 -m pip install --user gdown==5.2.0
+      - name: Fetch pinned donor and verify
+        run: |
+          set -euo pipefail
+          python3 -m gdown --id 13z87bzceVOA71cHmdXKKyN7F7yNYf1Yn -O donor.img.zst
+          test "$(stat -c%s donor.img.zst)" -eq 2683294844
+          echo 'b9155186e0bf0ef88ef30181395c7be85f854edfe7bddccf6029a8941b8274b1  donor.img.zst' | sha256sum -c -
+          zstd -d --stdout donor.img.zst > donor.img
+          rm donor.img.zst
+          test "$(stat -c%s donor.img)" -eq 6845104128
+      - name: Extract VINTF manifests and matrices without mounting
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python3 tools/extract_donor_vintf_debugfs.py donor.img evidence
+          rm donor.img
+      - name: Upload small evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: donor-oneui8-vintf-evidence
+          path: evidence/
+          if-no-files-found: ignore
+          retention-days: 14
