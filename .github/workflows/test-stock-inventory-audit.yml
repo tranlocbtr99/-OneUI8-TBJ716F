@@ -6,6 +6,8 @@ on:
     paths:
       - 'tools/audit_stock_inventory_artifact.py'
       - 'tests/test_stock_inventory_artifact.py'
+      - 'tools/check_tbj716f_super_budget.py'
+      - 'tests/test_tbj716f_super_budget.py'
       - '.github/workflows/test-stock-inventory-audit.yml'
   workflow_dispatch:
 permissions:
@@ -17,4 +19,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Unit tests (no firmware download or flashing)
+        run: python3 -m unittest discover -s tests -p 'test_*budget.py' -v
+      - name: Stock inventory audit tests
         run: python3 -m unittest discover -s tests -p 'test_stock_inventory_artifact.py' -v
