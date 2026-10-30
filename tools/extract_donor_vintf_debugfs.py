@@ -20,13 +20,17 @@ def walk(image, directory, depth=0):
         parts = line.split("/")
         if len(parts) < 7:
             continue
-        kind, name = parts[2], parts[5]
+        mode, name = parts[2], parts[5]
         if name in (".", "..") or not name:
             continue
+        try:
+            file_type = int(mode, 8) & 0o170000
+        except ValueError:
+            continue
         full = directory.rstrip("/") + "/" + name
-        if kind in ("2", "040000"):
+        if file_type == 0o040000:
             found.extend(walk(image, full, depth+1))
-        elif kind in ("1", "100000") and name.endswith(".xml"):
+        elif file_type == 0o100000 and name.endswith(".xml"):
             found.append(full)
     return found
 
