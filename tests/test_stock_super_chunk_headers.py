@@ -30,6 +30,17 @@ class ChunkHeaderTests(unittest.TestCase):
         self.assertTrue(result["segments"][0]["sparse_header"]["header_plausible"])
         self.assertFalse(result["image_reconstruction_authorized"])
 
+    def test_zero_chunks_sparse_not_plausible(self):
+        sparse=struct.pack("<IHHHHIIII",0xed26ff3a,1,0,28,12,4096,16,0,0)
+        result=mod.inspect_zip(self.archive({"super_1.img":sparse}))
+        self.assertFalse(result["all_sparse_headers_plausible"])
+        self.assertFalse(result["segments"][0]["sparse_header"]["header_plausible"])
+
+    def test_unreasonable_sparse_block_size(self):
+        sparse=struct.pack("<IHHHHIIII",0xed26ff3a,1,0,28,12,2**30,1,1,0)
+        result=mod.inspect_zip(self.archive({"super_1.img":sparse}))
+        self.assertFalse(result["all_sparse_headers_plausible"])
+
     def test_missing_segment(self):
         result=mod.inspect_zip(self.archive({"super_1.img":b"RAW","super_3.img":b"RAW"}))
         self.assertFalse(result["indices_contiguous"])
