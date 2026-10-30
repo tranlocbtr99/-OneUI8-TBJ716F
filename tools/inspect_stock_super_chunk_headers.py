@@ -47,6 +47,8 @@ def inspect_zip(path, prefix="super", limit=4096):
                           "zip_member_bytes":info.file_size,"first_bytes_sha256":hashlib.sha256(header).hexdigest(),
                           "first_32_hex":header[:32].hex(),"format":"android_sparse" if sparse else "unknown_or_raw",
                           "sparse_header":sparse_info})
+    if not found:
+        raise ValueError("No numbered super_*.img segments found in firmware ZIP")
     found.sort(key=lambda x:x["segment_index"])
     ids=[x["segment_index"] for x in found]
     return {"archive":str(path),"segments":found,"indices_contiguous":bool(ids) and ids==list(range(1,len(ids)+1)),
