@@ -43,6 +43,20 @@ def inspect_zip(path, prefix="super", limit=4096):
                              "total_blocks":total_blocks,"total_chunks":total_chunks,
                              "declared_output_bytes":block*total_blocks,
                              "header_plausible":plausible}
+            first_chunk=None
+            if sparse and sparse_info["header_plausible"] and len(header)>=file_hdr+chunk_hdr:
+                chunk_type,reserved,chunk_blocks,total_sz=struct.unpack_from("<HHII",header,file_hdr)
+                types={0xCAC1:"raw",0xCAC2:"fill",0xCAC3:"dont_care",0xCAC4:"crc32"}
+                chunk_name=types.get(chunk_type,"unknown")
+                payload_sizes={"raw":chunk_blocks*block,"fill":4,"dont_care":0,"crc32":4}
+                expected_chunk_size=chunk_hdr+payload_sizes.get(chunk_name,0)
+                first_chunk={"type":chunk_name,"type_hex":hex(chunk_type),"output_blocks":chunk_blocks,
+                             "total_size":total_sz,"expected_size":expected_chunk_size if chunk_name!="unknown" else None,
+                             "size_plausible":chunk_name!="unknown" and total_sz==expected_chunk_size and
+                                              total_sz<=info.file_size-file_hdr}
+                sparse_info["first_chunk"]=first_chunk
+            elif sparse:
+                sparse_info["first_chunk"]=None
             found.append({"archive_path":info.filename,"segment_index":index,
                           "zip_member_bytes":info.file_size,"first_bytes_sha256":hashlib.sha256(header).hexdigest(),
                           "first_32_hex":header[:32].hex(),"format":"android_sparse" if sparse else "unknown_or_raw",
