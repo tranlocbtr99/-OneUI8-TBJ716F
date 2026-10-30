@@ -110,6 +110,8 @@ jobs:
           print(json.dumps(results,indent=2))
           if not results:
               raise SystemExit('No super segments found')
+          if any(not item['structure_valid'] for item in results):
+              raise SystemExit('One or more super segments failed full sparse validation')
           PY
       - name: Upload metadata only
         if: always()
