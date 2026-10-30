@@ -24,6 +24,7 @@ class ChunkHeaderTests(unittest.TestCase):
         sparse=struct.pack("<IHHHHIIII",0xed26ff3a,1,0,28,12,4096,16,1,0)
         result=mod.inspect_zip(self.archive({"images/super_1.img":sparse}))
         self.assertTrue(result["indices_contiguous"])
+        self.assertTrue(result["all_sparse_headers_plausible"])
         self.assertEqual(result["segments"][0]["format"],"android_sparse")
         self.assertEqual(result["segments"][0]["sparse_header"]["declared_output_bytes"],65536)
         self.assertTrue(result["segments"][0]["sparse_header"]["header_plausible"])
@@ -36,6 +37,11 @@ class ChunkHeaderTests(unittest.TestCase):
     def test_truncated_sparse_header_rejected(self):
         with self.assertRaisesRegex(ValueError,"Truncated"):
             mod.inspect_zip(self.archive({"super_1.img":struct.pack("<I",0xed26ff3a)}))
+
+    def test_duplicate_index_rejected(self):
+        archive=self.archive({"a/super_1.img":b"abc","b/super_1.img":b"def"})
+        with self.assertRaisesRegex(ValueError,"Duplicate"):
+            mod.inspect_zip(archive)
 
     def test_unrelated_files_ignored(self):
         result=mod.inspect_zip(self.archive({"vendor_1.img":b"hello","super.img":b"hello"}))
