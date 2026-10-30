@@ -40,8 +40,6 @@ def validate(stream, size):
             remaining -= n
         consumed += total_size
         output_blocks += chunk_blocks
-        if output_blocks > blocks:
-            raise ValueError('too many output blocks')
         counts[name] += 1
     if output_blocks != blocks or consumed != size:
         raise ValueError('output block mismatch or trailing bytes')
