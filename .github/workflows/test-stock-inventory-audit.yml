@@ -10,6 +10,10 @@ on:
       - 'tests/test_tbj716f_super_budget.py'
       - 'tools/report_lp_partition_budget.py'
       - 'tests/test_lp_partition_budget.py'
+      - 'tools/inspect_stock_super_chunk_headers.py'
+      - 'tests/test_stock_super_chunk_headers.py'
+      - 'tools/validate_stock_super_segments.py'
+      - 'tests/test_stock_super_segments.py'
       - '.github/workflows/test-stock-inventory-audit.yml'
   workflow_dispatch:
 permissions:
@@ -22,5 +26,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Unit tests (no firmware download or flashing)
         run: python3 -m unittest discover -s tests -p 'test_*budget.py' -v
+      - name: Super segment inspection tests (synthetic ZIP, no firmware)
+        run: python3 -m unittest discover -s tests -p 'test_stock_super_*.py' -v
       - name: Stock inventory audit tests
         run: python3 -m unittest discover -s tests -p 'test_stock_inventory_artifact.py' -v
