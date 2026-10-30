@@ -31,6 +31,8 @@ def validate(stream, size):
         payload = {'raw': chunk_blocks*block, 'fill': 4, 'dont_care': 0, 'crc32': 4}[name]
         if total_size != ch+payload or consumed+total_size > size:
             raise ValueError('invalid payload size')
+        if output_blocks + chunk_blocks > blocks:
+            raise ValueError('too many output blocks')
         remaining = payload
         while remaining:
             n = min(1048576, remaining)
