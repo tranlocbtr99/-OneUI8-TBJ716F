@@ -1,0 +1,54 @@
+name: Audit TB-J716F stock inventory artifact
+on:
+  workflow_dispatch:
+    inputs:
+      artifact_id:
+        description: 'Existing stock partition inventory artifact ID'
+        required: true
+        default: '12953095300'
+        type: string
+permissions:
+  contents: read
+  actions: read
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate artifact ID
+        env:
+          ARTIFACT_ID: ${{ inputs.artifact_id }}
+        run: |
+          [[ "$ARTIFACT_ID" =~ ^[0-9]+$ ]] || { echo 'Numeric artifact ID required'; exit 1; }
+      - name: Download existing metadata artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ inputs.artifact_id }}
+        run: |
+          set -euo pipefail
+          gh api -H 'Accept: application/vnd.github+json' \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" > stock-inventory.zip
+          unzip -t stock-inventory.zip
+      - name: Analyze inventory references (read only)
+        run: |
+          python3 tools/audit_stock_inventory_artifact.py stock-inventory.zip --output stock-inventory-audit.json
+          python3 - <<'PY'
+          import json
+          d=json.load(open('stock-inventory-audit.json'))
+          with open('audit-summary.md','w') as f:
+              f.write('# TB-J716F stock inventory audit\n\n')
+              f.write(f"- XML files: {d['xml_count']}\n")
+              f.write(f"- Image references: {d['total_references']}\n")
+              f.write(f"- Unresolved filenames: {', '.join(sorted(d['unresolved_references'])) or 'none'}\n")
+              f.write('- This is metadata-only: no ROM image bytes inspected, no flashing.\n')
+          PY
+          cat audit-summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: tbj716f-stock-inventory-audit
+          path: |
+            stock-inventory-audit.json
+            audit-summary.md
+          retention-days: 7
