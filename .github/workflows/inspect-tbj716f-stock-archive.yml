@@ -44,6 +44,8 @@ jobs:
           PY
       - name: Inspect rawprogram super segment map
         run: python3 tools/inspect_qfil_rawprogram.py stock.zip --output stock-report/rawprogram-super-map.json
+      - name: Inspect actual super segment headers (read-only)
+        run: python3 tools/inspect_stock_super_chunk_headers.py stock.zip --output stock-report/super-segment-headers.json
       - name: Upload metadata only
         if: always()
         uses: actions/upload-artifact@v4
