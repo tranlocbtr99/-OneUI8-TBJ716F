@@ -56,6 +56,29 @@ jobs:
         run: python3 tools/inspect_qfil_rawprogram.py stock.zip --output stock-report/rawprogram-super-map.json
       - name: Inspect actual super segment headers (read-only)
         run: python3 tools/inspect_stock_super_chunk_headers.py stock.zip --output stock-report/super-segment-headers.json
+      - name: Validate complete sparse streams without extracting firmware
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, re, zipfile
+          from pathlib import Path
+          from tools.validate_sparse_stream import validate
+          results=[]
+          with zipfile.ZipFile('stock.zip') as z:
+              for info in sorted(z.infolist(), key=lambda x:x.filename):
+                  if not re.fullmatch(r'super_[1-9][0-9]*\\.img',Path(info.filename).name,re.I):
+                      continue
+                  with z.open(info) as stream:
+                      try:
+                          report=validate(stream,info.file_size)
+                          results.append({'file':info.filename,**report})
+                      except ValueError as exc:
+                          results.append({'file':info.filename,'structure_valid':False,'error':str(exc)})
+          Path('stock-report/super-sparse-stream-validation.json').write_text(json.dumps(results,indent=2)+'\\n')
+          print(json.dumps(results,indent=2))
+          if not results:
+              raise SystemExit('No super segments found')
+          PY
       - name: Upload metadata only
         if: always()
         uses: actions/upload-artifact@v4
