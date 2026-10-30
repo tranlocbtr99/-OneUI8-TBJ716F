@@ -13,10 +13,29 @@ jobs:
           curl -fL --retry 3 'https://mirrors-obs-1.lolinet.com/firmware/lenowow/2021/Tab_P11_Pro_2021/TB-J716F/TB-J716F_CN_OPEN_USER_Q00209.3_R_ZUI_13.0.430_ST_220113_qpst.zip' -o stock.zip
           unzip -Z1 stock.zip > archive-contents.txt
           grep -Ei 'vendor|super|rawprogram' archive-contents.txt | head -100
+          mkdir -p stock-evidence
+          cp archive-contents.txt stock-evidence/
+          for entry in rawprogram0.xml rawprogram1.xml rawprogram2.xml rawprogram3.xml rawprogram4.xml rawprogram5.xml rawprogram_fullupgrade.xml; do
+            if grep -Fxq "$entry" archive-contents.txt; then
+              unzip -p stock.zip "$entry" > "stock-evidence/$entry"
+            fi
+          done
+          python3 - <<'PY'
+          import json, glob, xml.etree.ElementTree as ET
+          rows=[]
+          for path in glob.glob('stock-evidence/rawprogram*.xml'):
+              root=ET.parse(path).getroot()
+              for node in root.iter():
+                  if node.tag.lower()=='program' and ('super' in node.get('filename','').lower() or 'super' in node.get('label','').lower()):
+                      rows.append({'xml':path,**node.attrib})
+          with open('stock-evidence/super-program-entries.json','w') as f:
+              json.dump(rows,f,indent=2)
+          print(json.dumps(rows,indent=2))
+          PY
       - name: Upload partition inventory
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: tbj716f-stock-partition-inventory
-          path: archive-contents.txt
+          path: stock-evidence/
           retention-days: 7
