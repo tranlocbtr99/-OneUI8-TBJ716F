@@ -23,7 +23,7 @@ def reconstruct(archive, output, report):
             start = int(a["start_sector"])
             sectors = int(a["num_partition_sectors"])
             sector_size = int(a["SECTOR_SIZE_IN_BYTES"])
-            if min(start, sectors, sector_size) < 1:
+            if start < 0 or sectors < 1 or sector_size not in (512, 4096):
                 raise ValueError("Invalid sector metadata")
             segments.append((start, sectors, sector_size, filename))
         if not segments:
@@ -34,6 +34,11 @@ def reconstruct(archive, output, report):
         base = segments[0][0]
         previous_end = base
         # Validate the entire sector map before creating any output file.
+        for start, sectors, size, filename in segments:
+            if start < previous_end:
+                raise ValueError("Overlapping super segments")
+            previous_end = start + sectors
+        previous_end = base
         for start, sectors, size, filename in segments:
             expected = sectors * size
             info = z.getinfo(filename)
