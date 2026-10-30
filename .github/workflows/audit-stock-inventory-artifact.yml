@@ -1,5 +1,11 @@
 name: Audit TB-J716F stock inventory artifact
 on:
+  push:
+    branches:
+      - audit/stock-super-mapping-20261030
+    paths:
+      - '.github/workflows/audit-stock-inventory-artifact.yml'
+      - 'tools/audit_stock_inventory_artifact.py'
   workflow_dispatch:
     inputs:
       artifact_id:
@@ -18,13 +24,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate artifact ID
         env:
-          ARTIFACT_ID: ${{ inputs.artifact_id }}
+          ARTIFACT_ID: ${{ inputs.artifact_id || '12953095300' }}
         run: |
           [[ "$ARTIFACT_ID" =~ ^[0-9]+$ ]] || { echo 'Numeric artifact ID required'; exit 1; }
       - name: Download existing metadata artifact
         env:
           GH_TOKEN: ${{ github.token }}
-          ARTIFACT_ID: ${{ inputs.artifact_id }}
+          ARTIFACT_ID: ${{ inputs.artifact_id || '12953095300' }}
         run: |
           set -euo pipefail
           gh api -H 'Accept: application/vnd.github+json' \
