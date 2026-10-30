@@ -33,6 +33,17 @@ def reconstruct(archive, output, report):
         segments.sort()
         base = segments[0][0]
         previous_end = base
+        # Validate the entire sector map before creating any output file.
+        for start, sectors, size, filename in segments:
+            expected = sectors * size
+            info = z.getinfo(filename)
+            if info.file_size != expected:
+                raise ValueError(f"Size mismatch {filename}: {info.file_size} != {expected}")
+            with z.open(info) as src:
+                if src.read(4) == struct.pack("<I", SPARSE_MAGIC):
+                    raise ValueError("Android sparse segment needs simg2img conversion: " + filename)
+        if len({item[3] for item in segments}) != len(segments):
+            raise ValueError("Duplicate segment filenames")
         records = []
         with open(output, "wb") as dst:
             for start, sectors, size, filename in segments:
