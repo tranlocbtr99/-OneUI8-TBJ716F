@@ -24,6 +24,10 @@ jobs:
           rm donor.img.zst
           test "$(stat -c%s donor.img)" -eq 6845104128
           echo '6946aa3fdcafa3475c1809b640f0df5c  donor.img' | md5sum -c -
+      - name: Audit super partition budget (metadata-only; not flash approval)
+        run: |
+          python3 tools/check_tbj716f_super_budget.py --donor-bytes "$(stat -c%s donor.img)" --output super-budget.json
+          cat super-budget.json >> "$GITHUB_STEP_SUMMARY"
       - name: Generate staging overlay and patch copied donor image
         run: |
           set -euo pipefail
@@ -39,5 +43,6 @@ jobs:
           path: |
             tbj716f-oneui8-engineering.img.zst
             build-report.json
+            super-budget.json
           retention-days: 3
           if-no-files-found: error
