@@ -1,0 +1,20 @@
+name: Stock inventory audit unit tests
+on:
+  push:
+    branches:
+      - audit/stock-super-mapping-20261030
+    paths:
+      - 'tools/audit_stock_inventory_artifact.py'
+      - 'tests/test_stock_inventory_artifact.py'
+      - '.github/workflows/test-stock-inventory-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unit tests (no firmware download or flashing)
+        run: python3 -m unittest discover -s tests -p 'test_stock_inventory_artifact.py' -v
