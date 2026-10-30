@@ -51,6 +51,26 @@ jobs:
           with open('stock-evidence/super-image-headers.json','w') as fp:json.dump(entries,fp,indent=2)
           print(json.dumps(entries,indent=2))
           PY
+      - name: Validate vendor candidate super_5.img
+        run: |
+          set -euo pipefail
+          unzip -p stock.zip super_5.img > candidate.img
+          python3 - <<'PY'
+          import hashlib,json,struct
+          p='candidate.img'
+          with open(p,'rb') as f:
+              h=hashlib.file_digest(f,'sha256').hexdigest()
+              f.seek(1080)
+              ext4_magic=f.read(2).hex()
+          result={'candidate':'super_5.img','sha256':h,'expected_vendor_sha256':'8fa552fda356d2407055ce2fb5ebc383e7122b5bca3825ff985b040ad49eeab1','sha256_matches':h=='8fa552fda356d2407055ce2fb5ebc383e7122b5bca3825ff985b040ad49eeab1','ext4_magic_at_1080':ext4_magic,'ext4_magic_valid':ext4_magic=='53ef'}
+          with open('stock-evidence/vendor-candidate-validation.json','w') as f:json.dump(result,f,indent=2)
+          print(json.dumps(result,indent=2))
+          PY
+          if [ "$(python3 -c "import json;print(json.load(open('stock-evidence/vendor-candidate-validation.json'))['ext4_magic_valid'])")" = True ]; then
+            mkdir -p stock-evidence/vendor-vintf
+            debugfs -R 'ls -p /etc/vintf' candidate.img > stock-evidence/vendor-vintf/listing.txt 2>&1 || true
+            debugfs -R 'cat /etc/vintf/manifest.xml' candidate.img > stock-evidence/vendor-vintf/manifest.xml 2>stock-evidence/vendor-vintf/debugfs-errors.txt || true
+          fi
       - name: Upload partition inventory
         if: always()
         uses: actions/upload-artifact@v4
