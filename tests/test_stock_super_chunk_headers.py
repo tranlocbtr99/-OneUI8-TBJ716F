@@ -55,8 +55,8 @@ class ChunkHeaderTests(unittest.TestCase):
             mod.inspect_zip(archive)
 
     def test_unrelated_files_ignored(self):
-        result=mod.inspect_zip(self.archive({"vendor_1.img":b"hello","super.img":b"hello"}))
-        self.assertEqual(result["segments"],[])
+        with self.assertRaisesRegex(ValueError,"No numbered super"):
+            mod.inspect_zip(self.archive({"vendor_1.img":b"hello","super.img":b"hello"}))
 
 if __name__=="__main__":
     unittest.main()
