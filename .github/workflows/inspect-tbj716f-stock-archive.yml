@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/inspect-tbj716f-stock-archive.yml'
       - 'tools/inspect_stock_super_chunk_headers.py'
+      - 'tools/validate_sparse_stream.py'
       - 'tools/inspect_qfil_rawprogram.py'
   workflow_dispatch:
     inputs:
@@ -49,7 +50,7 @@ jobs:
                  "entries": entries,
                  "vendor_candidates": [e for e in entries if any(x in e["name"].lower() for x in ("vendor", "super.img", "rawprogram", "payload.bin"))],
                  "warning": "File listing only. Firmware not flashed, vendor manifest not yet extracted."}
-          Path("stock-report/stock-archive-inventory.json").write_text(json.dumps(out,indent=2)+"\\n")
+          Path("stock-report/stock-archive-inventory.json").write_text(json.dumps(out,indent=2)+"\n")
           print(json.dumps(out["vendor_candidates"], indent=2))
           PY
       - name: Inspect rawprogram super segment map
@@ -66,7 +67,7 @@ jobs:
           results=[]
           with zipfile.ZipFile('stock.zip') as z:
               for info in sorted(z.infolist(), key=lambda x:x.filename):
-                  if not re.fullmatch(r'super_[1-9][0-9]*\\.img',Path(info.filename).name,re.I):
+                  if not re.fullmatch(r'super_[1-9][0-9]*\.img',Path(info.filename).name,re.I):
                       continue
                   with z.open(info) as stream:
                       try:
@@ -74,7 +75,7 @@ jobs:
                           results.append({'file':info.filename,**report})
                       except ValueError as exc:
                           results.append({'file':info.filename,'structure_valid':False,'error':str(exc)})
-          Path('stock-report/super-sparse-stream-validation.json').write_text(json.dumps(results,indent=2)+'\\n')
+          Path('stock-report/super-sparse-stream-validation.json').write_text(json.dumps(results,indent=2)+'\n')
           print(json.dumps(results,indent=2))
           if not results:
               raise SystemExit('No super segments found')
