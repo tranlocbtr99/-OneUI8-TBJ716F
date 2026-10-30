@@ -5,7 +5,6 @@ import json
 from pathlib import Path
 
 SECTOR_BYTES = 512
-TARGETS = ("system", "vendor", "product", "system_ext", "odm")
 
 def summarize(data, super_bytes, donor_bytes):
     if type(super_bytes) is not int or super_bytes <= 0 or type(donor_bytes) is not int or donor_bytes <= 0:
@@ -22,26 +21,33 @@ def summarize(data, super_bytes, donor_bytes):
         if not isinstance(extents, list):
             raise ValueError("missing extents")
         sectors = 0
+        physical_sectors = 0
         for e in extents:
             n = e.get("sectors")
             if type(n) is not int or n < 0 or e.get("type") not in (0, 1):
                 raise ValueError("unsupported extent")
             sectors += n
+            if e["type"] == 0:
+                physical_sectors += n
         entries.append({"name": name, "allocated_bytes": sectors * SECTOR_BYTES,
+                        "physical_linear_bytes": physical_sectors * SECTOR_BYTES,
                         "group_index": p.get("group_index")})
     by_name = {e["name"]: e for e in entries}
     if len(by_name) != len(entries):
         raise ValueError("duplicate partition names")
     system_candidates = [e for e in entries if e["name"] in ("system_a", "system")]
-    other = [e for e in entries if e not in system_candidates]
+    other = [e for e in entries if e["name"] not in ("system_a", "system")]
     total = sum(e["allocated_bytes"] for e in entries)
+    physical_total = sum(e["physical_linear_bytes"] for e in entries)
     return {"super_bytes": super_bytes, "donor_image_bytes": donor_bytes,
             "partitions": entries, "allocated_all_logical_bytes": total,
+            "allocated_linear_physical_bytes": physical_total,
             "non_system_allocated_bytes": sum(e["allocated_bytes"] for e in other),
             "nominal_remaining_after_donor_and_other_bytes": super_bytes - donor_bytes - sum(e["allocated_bytes"] for e in other),
+            "non_system_linear_physical_bytes": sum(e["physical_linear_bytes"] for e in other),
             "system_partition_candidates": system_candidates,
             "status": "evidence_only_not_flashable",
-            "warning": "Extent sizes include zero extents; metadata groups, slot sharing, sparse image used blocks and actual usable capacity must be verified before any repartition."}
+            "warning": "Nominal estimate includes zero-filled extents and may double-count A/B slots. Physical linear extents are reported separately. Metadata groups, slot sharing, sparse used blocks and actual usable capacity must be verified before repartition."}
 
 if __name__ == "__main__":
     p=argparse.ArgumentParser()
