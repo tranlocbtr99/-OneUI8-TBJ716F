@@ -37,6 +37,11 @@ def main():
     a = ap.parse_args()
     a.output.mkdir(parents=True, exist_ok=True)
     extracted = []
+    diagnostics = {}
+    for candidate in ("/", "/system", "/system/etc", "/system/etc/vintf", "/etc/vintf"):
+        result = debugfs(a.image, f"ls -p {candidate}")
+        diagnostics[candidate] = {"returncode": result.returncode, "stdout": result.stdout[:5000], "stderr": result.stderr[:1000]}
+    (a.output/"layout-diagnostics.json").write_text(json.dumps(diagnostics, indent=2)+"\n")
     for partition in PARTITIONS:
         for prefix in (f"/{partition}/etc/vintf", f"/etc/vintf" if partition == "system" else "/__missing__"):
             for source in walk(a.image, prefix):
@@ -52,7 +57,7 @@ def main():
               "complete_vintf": False, "flashable": False}
     (a.output/"report.json").write_text(json.dumps(report, indent=2)+"\n")
     if not extracted:
-        raise SystemExit("No VINTF XML extracted: inspect ext4 root layout before proceeding")
+        raise SystemExit("No VINTF XML extracted; see layout-diagnostics.json for actual ext4 paths")
     print(json.dumps(report, indent=2))
 if __name__ == "__main__":
     main()
