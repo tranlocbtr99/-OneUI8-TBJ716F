@@ -1,0 +1,22 @@
+name: Inspect TB-J716F stock vendor
+on:
+  workflow_dispatch:
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download stock archive
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 'https://mirrors-obs-1.lolinet.com/firmware/lenowow/2021/Tab_P11_Pro_2021/TB-J716F/TB-J716F_CN_OPEN_USER_Q00209.3_R_ZUI_13.0.430_ST_220113_qpst.zip' -o stock.zip
+          unzip -Z1 stock.zip > archive-contents.txt
+          grep -Ei 'vendor|super|rawprogram' archive-contents.txt | head -100
+      - name: Upload partition inventory
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tbj716f-stock-partition-inventory
+          path: archive-contents.txt
+          retention-days: 7
