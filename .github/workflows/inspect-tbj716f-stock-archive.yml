@@ -1,5 +1,12 @@
 name: Inspect TB-J716F stock firmware archive
 on:
+  push:
+    branches:
+      - audit/stock-super-mapping-20261030
+    paths:
+      - '.github/workflows/inspect-tbj716f-stock-archive.yml'
+      - 'tools/inspect_stock_super_chunk_headers.py'
+      - 'tools/inspect_qfil_rawprogram.py'
   workflow_dispatch:
     inputs:
       firmware_url:
@@ -21,6 +28,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if [[ -z "$URL" ]]; then
+            URL="https://mirrors-obs-1.lolinet.com/firmware/lenowow/2021/Tab_P11_Pro_2021/TB-J716F/TB-J716F_CN_OPEN_USER_Q00209.3_R_ZUI_13.0.430_ST_220113_qpst.zip"
+          fi
           [[ "$URL" == https://* ]] || exit 2
           mkdir -p stock-report
           curl --fail --location --retry 2 --proto '=https' --proto-redir '=https' --connect-timeout 30 --max-time 3000 --output stock.zip "$URL"
