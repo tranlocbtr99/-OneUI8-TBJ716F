@@ -41,7 +41,34 @@ jobs:
                               record['android_sparse']=src.read(4)==struct.pack('<I',0xED26FF3A)
                           record['file_bytes']=z.getinfo(fn).file_size
                       result['segments'].append(record)
-              result['reconstruction_supported']=bool(result['segments']) and all(x['present'] and not x['android_sparse'] for x in result['segments'])
+              issues=[]
+              spans=[]
+              for entry in result['segments']:
+                  try:
+                      start=int(entry['start_sector'])
+                      count=int(entry['sectors'])
+                      unit=int(entry['sector_bytes'])
+                      if start<0 or count<=0 or unit not in (512,4096):
+                          raise ValueError('invalid sector geometry')
+                      spans.append((start,start+count,unit,entry['file']))
+                      if not entry['present']:
+                          issues.append('missing segment: '+entry['file'])
+                      elif entry['android_sparse']:
+                          issues.append('Android sparse unsupported: '+entry['file'])
+                      elif entry['file_bytes']!=count*unit:
+                          issues.append('raw length mismatch: '+entry['file'])
+                  except (TypeError,ValueError) as exc:
+                      issues.append('invalid mapping: '+entry['file']+': '+str(exc))
+              if spans and len({s[2] for s in spans})!=1:
+                  issues.append('mixed sector sizes')
+              spans.sort()
+              for left,right in zip(spans,spans[1:]):
+                  if right[0]<left[1]:
+                      issues.append('overlapping segments: '+left[3]+' / '+right[3])
+              if not spans:
+                  issues.append('no super segments')
+              result['issues']=issues
+              result['reconstruction_supported']=not issues
               Path('report/reconstruction-preflight.json').write_text(json.dumps(result,indent=2)+chr(10))
               Path('report/reconstruction-supported.txt').write_text('true' if result['reconstruction_supported'] else 'false')
               print(json.dumps(result,indent=2))
