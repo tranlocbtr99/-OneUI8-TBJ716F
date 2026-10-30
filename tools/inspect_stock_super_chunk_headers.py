@@ -15,12 +15,17 @@ def inspect_zip(path, prefix="super", limit=4096):
     if not (64 <= limit <= 65536):
         raise ValueError("header limit outside safe range")
     found=[]
+    seen_indices=set()
     with zipfile.ZipFile(path) as z:
         for info in z.infolist():
             name=Path(info.filename).name
             match=re.fullmatch(re.escape(prefix)+r"_([1-9][0-9]*)\.img",name,re.I)
             if not match:
                 continue
+            index=int(match.group(1))
+            if index in seen_indices:
+                raise ValueError("Duplicate super segment index: "+str(index))
+            seen_indices.add(index)
             with z.open(info) as stream:
                 header=stream.read(min(info.file_size,limit))
             magic=struct.unpack_from("<I",header)[0] if len(header)>=4 else None
@@ -35,13 +40,14 @@ def inspect_zip(path, prefix="super", limit=4096):
                              "total_blocks":total_blocks,"total_chunks":total_chunks,
                              "declared_output_bytes":block*total_blocks,
                              "header_plausible":major==1 and file_hdr>=28 and chunk_hdr>=12 and block>=512 and block&(block-1)==0}
-            found.append({"archive_path":info.filename,"segment_index":int(match.group(1)),
+            found.append({"archive_path":info.filename,"segment_index":index,
                           "zip_member_bytes":info.file_size,"first_bytes_sha256":hashlib.sha256(header).hexdigest(),
                           "first_32_hex":header[:32].hex(),"format":"android_sparse" if sparse else "unknown_or_raw",
                           "sparse_header":sparse_info})
     found.sort(key=lambda x:x["segment_index"])
     ids=[x["segment_index"] for x in found]
     return {"archive":str(path),"segments":found,"indices_contiguous":bool(ids) and ids==list(range(1,len(ids)+1)),
+            "all_sparse_headers_plausible":bool(found) and all(s["format"]=="android_sparse" and s["sparse_header"]["header_plausible"] for s in found),
             "image_reconstruction_authorized":False,
             "warning":"Header identification alone cannot prove concatenation, complete chunk encoding or LP validity. No image bytes modified or flashed."}
 
