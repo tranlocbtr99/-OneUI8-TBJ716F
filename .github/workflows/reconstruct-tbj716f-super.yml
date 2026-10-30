@@ -14,7 +14,22 @@ jobs:
         run: |
           curl --fail --location --retry 2 --proto '=https' --proto-redir '=https' --max-time 3000 --output stock.zip 'https://mirrors-obs-1.lolinet.com/firmware/lenowow/2021/Tab_P11_Pro_2021/TB-J716F/TB-J716F_CN_OPEN_USER_Q00209.3_R_ZUI_13.0.430_ST_220113_qpst.zip'
           unzip -tq stock.zip
+      - name: Preflight stock super segment structure
+        id: preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p report
+          python3 tools/inspect_stock_super_chunk_headers.py stock.zip --output report/super-segment-headers.json
+          if unzip -Z1 stock.zip | grep -Fxq 'rawprogram_unsparse0.xml'; then
+            echo 'reconstruct=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'reconstruct=false' >> "$GITHUB_OUTPUT"
+            printf '%s\\n' 'SKIPPED: rawprogram_unsparse0.xml is absent; current reconstruction tool requires an explicit per-segment sector map. No image guessed or flashed.' > report/reconstruction-preflight.txt
+            cat report/reconstruction-preflight.txt >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Reconstruct and inspect local super
+        if: steps.preflight.outputs.reconstruct == 'true'
         run: |
           mkdir -p report
           python3 tools/reconstruct_qfil_super.py stock.zip --output super.img --report report/super-reconstruction.json
@@ -27,12 +42,16 @@ jobs:
           Path('report/super-first64-hex.txt').write_text(h[:64].hex()+'\\n')
           PY
       - name: Probe LP geometry and verify checksum
+        if: steps.preflight.outputs.reconstruct == 'true'
         run: python3 tools/probe_lp_geometry.py super.img --output report/lp-geometry.json
       - name: Validate LP metadata tables and enumerate vendor extents
+        if: steps.preflight.outputs.reconstruct == 'true'
         run: python3 tools/inspect_lp_metadata.py super.img --output report/lp-partitions.json
       - name: Report logical partition extent budget
+        if: steps.preflight.outputs.reconstruct == 'true'
         run: python3 tools/report_lp_partition_budget.py report/lp-partitions.json --output report/lp-partition-budget.json
       - name: Extract stock vendor_a (local read-only)
+        if: steps.preflight.outputs.reconstruct == 'true'
         run: |
           python3 tools/extract_lp_partition.py super.img --partition vendor_a --output vendor_a.img --report report/vendor-a-extraction.json
           file vendor_a.img | tee report/vendor-a-file-type.txt
@@ -43,6 +62,7 @@ jobs:
           print('vendor_a first 64 bytes:', h[:64].hex())
           PY
       - name: Extract stock vendor VINTF manifest (read-only)
+        if: steps.preflight.outputs.reconstruct == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -73,6 +93,7 @@ jobs:
               raise SystemExit('Stock manifest lacks target-level or HAL entries')
           PY
       - name: Inventory vendor VINTF fragments and compatibility evidence
+        if: steps.preflight.outputs.reconstruct == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -95,6 +116,7 @@ jobs:
           print('Extracted vendor manifest fragments:',len(status))
           PY
       - name: Compare stock Lenovo VINTF against One UI 8 donor
+        if: steps.preflight.outputs.reconstruct == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
