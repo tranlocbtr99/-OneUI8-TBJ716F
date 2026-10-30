@@ -15,6 +15,8 @@ class LpBudgetTests(unittest.TestCase):
             {"name":"product_a","group_index":0,"extents":[{"sectors":4,"type":1}]}]}
         report=module.summarize(data,100000,20000)
         self.assertEqual(report["non_system_allocated_bytes"],7168)
+        self.assertEqual(report["non_system_linear_physical_bytes"],5120)
+        self.assertEqual(report["allocated_linear_physical_bytes"],15360)
         self.assertEqual(report["nominal_remaining_after_donor_and_other_bytes"],72832)
         self.assertEqual(report["status"],"evidence_only_not_flashable")
 
