@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/audit-stock-inventory-artifact.yml'
       - 'tools/audit_stock_inventory_artifact.py'
+      - 'tools/validate_stock_super_segments.py'
   workflow_dispatch:
     inputs:
       artifact_id:
@@ -50,11 +51,16 @@ jobs:
               f.write('- This is metadata-only: no ROM image bytes inspected, no flashing.\n')
           PY
           cat audit-summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Validate super segment evidence (fail closed)
+        run: |
+          python3 tools/validate_stock_super_segments.py stock-inventory-audit.json --output super-segment-validation.json
+          cat super-segment-validation.json >> "$GITHUB_STEP_SUMMARY"
       - name: Upload audit report
         uses: actions/upload-artifact@v4
         with:
           name: tbj716f-stock-inventory-audit
           path: |
             stock-inventory-audit.json
+            super-segment-validation.json
             audit-summary.md
           retention-days: 7
