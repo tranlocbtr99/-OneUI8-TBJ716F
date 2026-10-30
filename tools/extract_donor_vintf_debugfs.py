@@ -2,7 +2,6 @@
 """Read VINTF XML from a verified ext4 donor using read-only debugfs."""
 import argparse
 import json
-import re
 import subprocess
 from pathlib import Path
 
@@ -25,9 +24,9 @@ def walk(image, directory, depth=0):
         if name in (".", "..") or not name:
             continue
         full = directory.rstrip("/") + "/" + name
-        if kind == "040000":
+        if kind in ("2", "040000"):
             found.extend(walk(image, full, depth+1))
-        elif kind == "100000" and name.endswith(".xml"):
+        elif kind in ("1", "100000") and name.endswith(".xml"):
             found.append(full)
     return found
 
@@ -41,7 +40,8 @@ def main():
     for partition in PARTITIONS:
         for prefix in (f"/{partition}/etc/vintf", f"/etc/vintf" if partition == "system" else "/__missing__"):
             for source in walk(a.image, prefix):
-                target = a.output / partition / source.removeprefix(f"/{partition}/")
+                rel = source.removeprefix(f"/{partition}/") if source.startswith(f"/{partition}/") else source.lstrip("/")
+                target = a.output / partition / rel
                 target.parent.mkdir(parents=True, exist_ok=True)
                 result = debugfs(a.image, f"dump {source} {target}")
                 if result.returncode or not target.is_file() or not target.stat().st_size:
